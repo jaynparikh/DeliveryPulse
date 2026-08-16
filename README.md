@@ -83,33 +83,37 @@ The Copilot uses current delivery context to generate management-focused analysi
 
 ## Application Screens
 
-### Dashboard
+### Delivery Dashboard
 
 ![DeliveryPulse Dashboard](screenshots/dashboard.png)
 
-### Projects
+### Project Portfolio
 
 ![DeliveryPulse Projects](screenshots/projects.png)
 
-### Project Details
+### Risk Management
 
-![Project Details](screenshots/project-details.png)
+![DeliveryPulse Risks](screenshots/risks.png)
 
-### Risks
+### Resource Capacity
 
-![Delivery Risks](screenshots/risks.png)
-
-### Resources
-
-![Resource Capacity](screenshots/resources.png)
-
-### Daily Delivery Brief
-
-![Daily Delivery Brief](screenshots/daily-brief.png)
+![DeliveryPulse Resources](screenshots/resources.png)
 
 ### AI Delivery Copilot
 
-![Delivery Copilot](screenshots/copilot.png)
+The Copilot allows delivery managers to ask natural-language questions about portfolio health, risks, capacity, and management priorities.
+
+![DeliveryPulse Copilot](screenshots/copilot.png)
+
+### AI-Powered Delivery Analysis
+
+Example of the Copilot analyzing portfolio data and recommending management intervention.
+
+![DeliveryPulse Copilot Response](screenshots/copilot-response.png)
+
+### Login
+
+![DeliveryPulse Login](screenshots/login.png)
 
 ---
 
