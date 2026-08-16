@@ -1,56 +1,184 @@
-# Welcome to your Expo app 👋
+# DeliveryPulse
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+### AI-Powered Project Delivery Intelligence
 
-## Get started
+DeliveryPulse is a portfolio-level project delivery management application designed to help delivery managers identify project exceptions, delivery risks, capacity constraints, and management priorities from a single interface.
 
-1. Install dependencies
+Rather than focusing only on project tracking, DeliveryPulse is built around a simple question:
 
-   ```bash
-   npm install
-   ```
+> **Where does management attention need to go next?**
 
-2. Start the app
+The application combines portfolio data with AI-powered delivery analysis to provide decision-focused insights across projects, risks, resources, and delivery health.
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## Key Features
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Portfolio Dashboard
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Provides a management-level view of:
 
-## Get a fresh project
+- Active projects
+- Projects requiring attention
+- Portfolio delivery progress
+- Open delivery risks
+- High-priority risks
+- Resource capacity concerns
 
-When you're ready, run:
+The dashboard highlights exceptions instead of requiring managers to inspect every project individually.
 
-```bash
-npm run reset-project
-```
+### Project Management
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+View project-level information including:
 
-### Other setup steps
+- Delivery status
+- Progress
+- Target date
+- Project owner
+- Delivery risk
+- Management assessment
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Projects are classified as:
 
-## Learn more
+- Healthy
+- Watch
+- At Risk
 
-To learn more about developing your project with Expo, look at the following resources:
+### Risk Management
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Centralized delivery risk tracking with:
 
-## Join the community
+- Risk severity
+- Risk status
+- Project association
+- Risk owner
+- Description
+- Recommended management action
 
-Join our community of developers creating universal apps.
+Risk detail screens provide additional delivery assessment and management context.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Resource Capacity
+
+Monitor resource allocation and identify capacity pressure.
+
+DeliveryPulse highlights:
+
+- Current allocation
+- Available capacity
+- Overloaded resources
+- Project assignment
+- Capacity assessment
+
+This helps identify delivery risk created by sustained resource over-allocation.
+
+### Daily Delivery Brief
+
+DeliveryPulse automatically generates a short management brief based on current portfolio data.
+
+The brief prioritizes actions such as:
+
+- Reviewing At Risk projects
+- Acting on critical delivery risks
+- Monitoring Watch projects
+- Addressing overloaded resources
+
+The objective is to convert delivery data into a short list of management actions.
+
+### AI Delivery Copilot
+
+The DeliveryPulse Copilot allows managers to ask natural-language questions about their delivery portfolio.
+
+Example questions:
+
+- Which project needs my intervention?
+- Which projects need attention?
+- What are my highest delivery risks?
+- Who is overloaded?
+- Give me a portfolio summary.
+
+The Copilot combines current project, risk, and resource data with an AI model to produce management-focused responses.
+
+---
+
+## Application Screens
+
+### Dashboard
+
+![DeliveryPulse Dashboard](screenshots/dashboard.png)
+
+### Projects
+
+![Projects](screenshots/projects.png)
+
+### Project Details
+
+![Project Details](screenshots/project-details.png)
+
+### Risks
+
+![Risks](screenshots/risks.png)
+
+### Resource Capacity
+
+![Resources](screenshots/resources.png)
+
+### Daily Delivery Brief
+
+![Daily Delivery Brief](screenshots/daily-brief.png)
+
+### AI Delivery Copilot
+
+![Delivery Copilot](screenshots/copilot.png)
+
+---
+
+## Technology Stack
+
+### Mobile / Frontend
+
+- React Native
+- Expo
+- TypeScript
+- Expo Router
+
+### Backend
+
+- Node.js
+- Express
+- TypeScript
+- REST APIs
+
+### Database
+
+- PostgreSQL
+- Prisma ORM
+
+### AI
+
+- Google Gemini
+- `@google/genai`
+
+### Development
+
+- VS Code
+- Git
+- GitHub
+
+---
+
+## Architecture
+
+DeliveryPulse uses a layered architecture:
+
+```text
+React Native / Expo
+        |
+        | REST API
+        v
+Node.js / Express
+        |
+        +------------------+
+        |                  |
+        v                  v
+ PostgreSQL             Gemini
+   Prisma               AI API
