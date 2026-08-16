@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,27 +11,70 @@ import {
 
 import { colors, radius, spacing } from '../theme';
 import BottomNav from '../components/BottomNav';
+import {
+  getProjects,
+  Project,
+} from '../services/api';
 
-const projects = [
-  {
-    name: 'Project Phoenix',
-    client: 'Enterprise IoT Platform',
-    owner: 'Arjun Mehta',
-    progress: 72,
-    status: 'At Risk',
-    statusType: 'danger',
-    target: '30 Sep 2026',
-    risk: 'API integration is 3 days behind schedule.',
+type Milestone = {
+  name: string;
+  progress: number;
+  status:
+    | 'Completed'
+    | 'In Progress'
+    | 'Delayed'
+    | 'Not Started'
+    | 'Planned';
+};
+
+type ProjectIssue = {
+  title: string;
+  severity: 'High' | 'Medium';
+  owner: string;
+  detail: string;
+};
+
+type ProjectDetailData = {
+  team: string;
+  startDate: string;
+  budget: string;
+  milestones: Milestone[];
+  issues: ProjectIssue[];
+  aiInsight: string;
+};
+
+const projectDetails: Record<string, ProjectDetailData> = {
+  'Project Phoenix': {
     team: '8 members',
     startDate: '01 Jun 2026',
     budget: '$420K',
 
     milestones: [
-      { name: 'Requirements', progress: 100, status: 'Completed' },
-      { name: 'Development', progress: 82, status: 'In Progress' },
-      { name: 'API Integration', progress: 55, status: 'Delayed' },
-      { name: 'UAT', progress: 20, status: 'Not Started' },
-      { name: 'Go-Live', progress: 0, status: 'Not Started' },
+      {
+        name: 'Requirements',
+        progress: 100,
+        status: 'Completed',
+      },
+      {
+        name: 'Development',
+        progress: 82,
+        status: 'In Progress',
+      },
+      {
+        name: 'API Integration',
+        progress: 55,
+        status: 'Delayed',
+      },
+      {
+        name: 'UAT',
+        progress: 20,
+        status: 'Not Started',
+      },
+      {
+        name: 'Go-Live',
+        progress: 0,
+        status: 'Not Started',
+      },
     ],
 
     issues: [
@@ -37,13 +82,15 @@ const projects = [
         title: 'API integration delay',
         severity: 'High',
         owner: 'Arjun Mehta',
-        detail: 'Integration is currently 3 days behind the planned schedule.',
+        detail:
+          'Integration is currently 3 days behind the planned schedule.',
       },
       {
         title: 'External dependency',
         severity: 'Medium',
         owner: 'Engineering',
-        detail: 'Partner API response time is affecting integration testing.',
+        detail:
+          'Partner API response time is affecting integration testing.',
       },
     ],
 
@@ -51,25 +98,37 @@ const projects = [
       'Phoenix is currently at risk primarily because of the delayed API integration. The immediate priority should be dependency closure and a short recovery plan. If the integration delay extends beyond the current buffer, the target date may be impacted.',
   },
 
-  {
-    name: 'Project Atlas',
-    client: 'Customer Analytics',
-    owner: 'Neha Shah',
-    progress: 58,
-    status: 'Watch',
-    statusType: 'warning',
-    target: '15 Oct 2026',
-    risk: '5 unresolved UAT defects.',
+  'Project Atlas': {
     team: '10 members',
     startDate: '15 May 2026',
     budget: '$310K',
 
     milestones: [
-      { name: 'Requirements', progress: 100, status: 'Completed' },
-      { name: 'Development', progress: 90, status: 'Completed' },
-      { name: 'Data Integration', progress: 75, status: 'In Progress' },
-      { name: 'UAT', progress: 45, status: 'In Progress' },
-      { name: 'Go-Live', progress: 0, status: 'Not Started' },
+      {
+        name: 'Requirements',
+        progress: 100,
+        status: 'Completed',
+      },
+      {
+        name: 'Development',
+        progress: 90,
+        status: 'Completed',
+      },
+      {
+        name: 'Data Integration',
+        progress: 75,
+        status: 'In Progress',
+      },
+      {
+        name: 'UAT',
+        progress: 45,
+        status: 'In Progress',
+      },
+      {
+        name: 'Go-Live',
+        progress: 0,
+        status: 'Not Started',
+      },
     ],
 
     issues: [
@@ -77,7 +136,8 @@ const projects = [
         title: 'UAT defects',
         severity: 'Medium',
         owner: 'QA Team',
-        detail: 'Five defects remain unresolved before UAT completion.',
+        detail:
+          'Five defects remain unresolved before UAT completion.',
       },
     ],
 
@@ -85,25 +145,37 @@ const projects = [
       'Atlas remains manageable but requires focused attention on UAT closure. The current delivery position is recoverable if defect resolution remains on schedule and no new critical issues emerge.',
   },
 
-  {
-    name: 'Project Nova',
-    client: 'Mobile Experience',
-    owner: 'Rahul Patel',
-    progress: 84,
-    status: 'Healthy',
-    statusType: 'success',
-    target: '20 Sep 2026',
-    risk: 'No major risks currently identified.',
+  'Project Nova': {
     team: '7 members',
     startDate: '10 Apr 2026',
     budget: '$280K',
 
     milestones: [
-      { name: 'Requirements', progress: 100, status: 'Completed' },
-      { name: 'Development', progress: 100, status: 'Completed' },
-      { name: 'Integration', progress: 95, status: 'Completed' },
-      { name: 'UAT', progress: 80, status: 'In Progress' },
-      { name: 'Go-Live', progress: 25, status: 'Planned' },
+      {
+        name: 'Requirements',
+        progress: 100,
+        status: 'Completed',
+      },
+      {
+        name: 'Development',
+        progress: 100,
+        status: 'Completed',
+      },
+      {
+        name: 'Integration',
+        progress: 95,
+        status: 'Completed',
+      },
+      {
+        name: 'UAT',
+        progress: 80,
+        status: 'In Progress',
+      },
+      {
+        name: 'Go-Live',
+        progress: 25,
+        status: 'Planned',
+      },
     ],
 
     issues: [],
@@ -112,25 +184,37 @@ const projects = [
       'Nova is progressing well and remains on track for the target date. The main focus should now be UAT completion and go-live readiness while maintaining the current delivery momentum.',
   },
 
-  {
-    name: 'Project Orion',
-    client: 'Data Modernization',
-    owner: 'Priya Desai',
-    progress: 66,
-    status: 'Healthy',
-    statusType: 'success',
-    target: '12 Nov 2026',
-    risk: 'Delivery tracking is currently on plan.',
+  'Project Orion': {
     team: '12 members',
     startDate: '01 Jul 2026',
     budget: '$510K',
 
     milestones: [
-      { name: 'Discovery', progress: 100, status: 'Completed' },
-      { name: 'Architecture', progress: 90, status: 'In Progress' },
-      { name: 'Data Migration', progress: 60, status: 'In Progress' },
-      { name: 'Validation', progress: 20, status: 'Not Started' },
-      { name: 'Go-Live', progress: 0, status: 'Not Started' },
+      {
+        name: 'Discovery',
+        progress: 100,
+        status: 'Completed',
+      },
+      {
+        name: 'Architecture',
+        progress: 90,
+        status: 'In Progress',
+      },
+      {
+        name: 'Data Migration',
+        progress: 60,
+        status: 'In Progress',
+      },
+      {
+        name: 'Validation',
+        progress: 20,
+        status: 'Not Started',
+      },
+      {
+        name: 'Go-Live',
+        progress: 0,
+        status: 'Not Started',
+      },
     ],
 
     issues: [],
@@ -139,25 +223,37 @@ const projects = [
       'Orion is currently tracking according to plan. The primary management focus should remain on data migration quality and ensuring that upcoming validation activities have clear entry criteria.',
   },
 
-  {
-    name: 'Project Horizon',
-    client: 'Cloud Migration',
-    owner: 'Vivek Shah',
-    progress: 41,
-    status: 'Watch',
-    statusType: 'warning',
-    target: '05 Dec 2026',
-    risk: 'Cloud environment provisioning is taking longer than planned.',
+  'Project Horizon': {
     team: '9 members',
     startDate: '20 Jul 2026',
     budget: '$390K',
 
     milestones: [
-      { name: 'Assessment', progress: 100, status: 'Completed' },
-      { name: 'Cloud Setup', progress: 45, status: 'Delayed' },
-      { name: 'Migration', progress: 20, status: 'Not Started' },
-      { name: 'Testing', progress: 0, status: 'Not Started' },
-      { name: 'Go-Live', progress: 0, status: 'Not Started' },
+      {
+        name: 'Assessment',
+        progress: 100,
+        status: 'Completed',
+      },
+      {
+        name: 'Cloud Setup',
+        progress: 45,
+        status: 'Delayed',
+      },
+      {
+        name: 'Migration',
+        progress: 20,
+        status: 'Not Started',
+      },
+      {
+        name: 'Testing',
+        progress: 0,
+        status: 'Not Started',
+      },
+      {
+        name: 'Go-Live',
+        progress: 0,
+        status: 'Not Started',
+      },
     ],
 
     issues: [
@@ -165,7 +261,8 @@ const projects = [
         title: 'Environment provisioning',
         severity: 'Medium',
         owner: 'Cloud Team',
-        detail: 'Required cloud environments are taking longer than planned to provision.',
+        detail:
+          'Required cloud environments are taking longer than planned to provision.',
       },
     ],
 
@@ -173,25 +270,37 @@ const projects = [
       'Horizon requires attention because environment provisioning is delaying the start of migration activities. The team should establish a firm provisioning completion date and assess whether migration activities can be parallelized.',
   },
 
-  {
-    name: 'Project Vertex',
-    client: 'AI Transformation',
-    owner: 'Karan Mehta',
-    progress: 91,
-    status: 'Healthy',
-    statusType: 'success',
-    target: '28 Aug 2026',
-    risk: 'Final validation activities are in progress.',
+  'Project Vertex': {
     team: '6 members',
     startDate: '15 Mar 2026',
     budget: '$350K',
 
     milestones: [
-      { name: 'Discovery', progress: 100, status: 'Completed' },
-      { name: 'Development', progress: 100, status: 'Completed' },
-      { name: 'Integration', progress: 100, status: 'Completed' },
-      { name: 'Validation', progress: 90, status: 'In Progress' },
-      { name: 'Go-Live', progress: 70, status: 'In Progress' },
+      {
+        name: 'Discovery',
+        progress: 100,
+        status: 'Completed',
+      },
+      {
+        name: 'Development',
+        progress: 100,
+        status: 'Completed',
+      },
+      {
+        name: 'Integration',
+        progress: 100,
+        status: 'Completed',
+      },
+      {
+        name: 'Validation',
+        progress: 90,
+        status: 'In Progress',
+      },
+      {
+        name: 'Go-Live',
+        progress: 70,
+        status: 'In Progress',
+      },
     ],
 
     issues: [],
@@ -199,24 +308,118 @@ const projects = [
     aiInsight:
       'Vertex is close to completion and remains healthy. Final validation and go-live readiness are the key priorities. Any late-stage critical defects should be resolved without compromising the planned release window.',
   },
-];
+};
 
 export default function ProjectDetailsScreen() {
-  const { name } = useLocalSearchParams<{ name: string }>();
+  const { name } = useLocalSearchParams<{
+    name?: string | string[];
+  }>();
 
-  const project = projects.find((item) => item.name === name);
+  const projectName = Array.isArray(name)
+    ? name[0]
+    : name;
 
-  if (!project) {
+  const [project, setProject] =
+    useState<Project | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadProject = async () => {
+      if (!projectName) {
+        setError('Project name was not provided.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError('');
+
+        const projects = await getProjects();
+
+        const selectedProject = projects.find(
+          (item) => item.name === projectName
+        );
+
+        if (!ignore) {
+          if (!selectedProject) {
+            setError('Project not found.');
+          } else {
+            setProject(selectedProject);
+          }
+        }
+      } catch (err) {
+        console.error(
+          'Project details loading error:',
+          err
+        );
+
+        if (!ignore) {
+          setError(
+            'Unable to load project details from DeliveryPulse API.'
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadProject();
+
+    return () => {
+      ignore = true;
+    };
+  }, [projectName]);
+
+  const detail = projectName
+    ? projectDetails[projectName]
+    : undefined;
+
+  if (loading) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator
+            size="small"
+            color={colors.primary}
+          />
+
+          <Text style={styles.loadingText}>
+            Loading project details...
+          </Text>
+        </View>
+
+        <BottomNav />
+      </View>
+    );
+  }
+
+  if (error || !project || !detail) {
     return (
       <View style={styles.screen}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Project not found</Text>
+          <Text style={styles.errorTitle}>
+            Project not found
+          </Text>
+
+          <Text style={styles.errorMessage}>
+            {error ||
+              'Detailed information is not available for this project.'}
+          </Text>
 
           <Pressable
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backButtonText}>Go Back</Text>
+            <Text style={styles.backButtonText}>
+              Go Back
+            </Text>
           </Pressable>
         </View>
 
@@ -236,14 +439,24 @@ export default function ProjectDetailsScreen() {
           style={styles.backLink}
           onPress={() => router.back()}
         >
-          <Text style={styles.backLinkText}>‹ Projects</Text>
+          <Text style={styles.backLinkText}>
+            ‹ Projects
+          </Text>
         </Pressable>
 
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={styles.eyebrow}>PROJECT DELIVERY</Text>
-            <Text style={styles.title}>{project.name}</Text>
-            <Text style={styles.subtitle}>{project.client}</Text>
+            <Text style={styles.eyebrow}>
+              PROJECT DELIVERY
+            </Text>
+
+            <Text style={styles.title}>
+              {project.name}
+            </Text>
+
+            <Text style={styles.subtitle}>
+              {project.client}
+            </Text>
           </View>
 
           <View
@@ -260,9 +473,12 @@ export default function ProjectDetailsScreen() {
             <Text
               style={[
                 styles.statusText,
-                project.statusType === 'danger' && styles.dangerText,
-                project.statusType === 'warning' && styles.warningText,
-                project.statusType === 'success' && styles.successText,
+                project.statusType === 'danger' &&
+                  styles.dangerText,
+                project.statusType === 'warning' &&
+                  styles.warningText,
+                project.statusType === 'success' &&
+                  styles.successText,
               ]}
             >
               {project.status}
@@ -273,7 +489,10 @@ export default function ProjectDetailsScreen() {
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
             <View>
-              <Text style={styles.cardLabel}>DELIVERY PROGRESS</Text>
+              <Text style={styles.cardLabel}>
+                DELIVERY PROGRESS
+              </Text>
+
               <Text style={styles.progressValue}>
                 {project.progress}%
               </Text>
@@ -288,109 +507,168 @@ export default function ProjectDetailsScreen() {
             <View
               style={[
                 styles.progressBar,
-                { width: `${project.progress}%` },
-                project.statusType === 'danger' && styles.dangerBar,
-                project.statusType === 'warning' && styles.warningBar,
-                project.statusType === 'success' && styles.successBar,
+                {
+                  width: `${project.progress}%`,
+                },
+                project.statusType === 'danger' &&
+                  styles.dangerBar,
+                project.statusType === 'warning' &&
+                  styles.warningBar,
+                project.statusType === 'success' &&
+                  styles.successBar,
               ]}
             />
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Project Overview</Text>
+        <Text style={styles.sectionTitle}>
+          Project Overview
+        </Text>
 
         <View style={styles.overviewGrid}>
           <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>PROJECT OWNER</Text>
-            <Text style={styles.infoValue}>{project.owner}</Text>
+            <Text style={styles.infoLabel}>
+              PROJECT OWNER
+            </Text>
+
+            <Text style={styles.infoValue}>
+              {project.owner}
+            </Text>
           </View>
 
           <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>TEAM SIZE</Text>
-            <Text style={styles.infoValue}>{project.team}</Text>
+            <Text style={styles.infoLabel}>
+              TEAM SIZE
+            </Text>
+
+            <Text style={styles.infoValue}>
+              {detail.team}
+            </Text>
           </View>
 
           <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>START DATE</Text>
-            <Text style={styles.infoValue}>{project.startDate}</Text>
+            <Text style={styles.infoLabel}>
+              START DATE
+            </Text>
+
+            <Text style={styles.infoValue}>
+              {detail.startDate}
+            </Text>
           </View>
 
           <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>BUDGET</Text>
-            <Text style={styles.infoValue}>{project.budget}</Text>
+            <Text style={styles.infoLabel}>
+              BUDGET
+            </Text>
+
+            <Text style={styles.infoValue}>
+              {detail.budget}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Milestones</Text>
+        <Text style={styles.sectionTitle}>
+          Milestones
+        </Text>
 
         <View style={styles.card}>
-          {project.milestones.map((milestone, index) => (
-            <View
-              key={milestone.name}
-              style={[
-                styles.milestoneRow,
-                index !== project.milestones.length - 1 &&
-                  styles.milestoneBorder,
-              ]}
-            >
-              <View style={styles.milestoneMain}>
-                <Text style={styles.milestoneName}>
-                  {milestone.name}
-                </Text>
+          {detail.milestones.map(
+            (milestone, index) => (
+              <View
+                key={milestone.name}
+                style={[
+                  styles.milestoneRow,
+                  index !==
+                    detail.milestones.length - 1 &&
+                    styles.milestoneBorder,
+                ]}
+              >
+                <View style={styles.milestoneMain}>
+                  <Text
+                    style={styles.milestoneName}
+                  >
+                    {milestone.name}
+                  </Text>
 
-                <View style={styles.milestoneProgressBackground}>
                   <View
+                    style={
+                      styles.milestoneProgressBackground
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.milestoneProgressBar,
+                        {
+                          width: `${milestone.progress}%`,
+                        },
+                        milestone.status ===
+                          'Delayed' &&
+                          styles.dangerBar,
+                        milestone.status ===
+                          'In Progress' &&
+                          styles.warningBar,
+                        milestone.status ===
+                          'Completed' &&
+                          styles.successBar,
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.milestoneRight}>
+                  <Text
+                    style={styles.milestonePercent}
+                  >
+                    {milestone.progress}%
+                  </Text>
+
+                  <Text
                     style={[
-                      styles.milestoneProgressBar,
-                      { width: `${milestone.progress}%` },
-                      milestone.status === 'Delayed' &&
-                        styles.dangerBar,
-                      milestone.status === 'In Progress' &&
-                        styles.warningBar,
-                      milestone.status === 'Completed' &&
-                        styles.successBar,
+                      styles.milestoneStatus,
+                      milestone.status ===
+                        'Completed' &&
+                        styles.successText,
+                      milestone.status ===
+                        'In Progress' &&
+                        styles.warningText,
+                      milestone.status ===
+                        'Delayed' &&
+                        styles.dangerText,
                     ]}
-                  />
+                  >
+                    {milestone.status}
+                  </Text>
                 </View>
               </View>
-
-              <View style={styles.milestoneRight}>
-                <Text style={styles.milestonePercent}>
-                  {milestone.progress}%
-                </Text>
-
-                <Text
-                  style={[
-                    styles.milestoneStatus,
-                    milestone.status === 'Completed' &&
-                      styles.successText,
-                    milestone.status === 'In Progress' &&
-                      styles.warningText,
-                    milestone.status === 'Delayed' &&
-                      styles.dangerText,
-                  ]}
-                >
-                  {milestone.status}
-                </Text>
-              </View>
-            </View>
-          ))}
+            )
+          )}
         </View>
 
-        <Text style={styles.sectionTitle}>Risks & Issues</Text>
+        <Text style={styles.sectionTitle}>
+          Risks & Issues
+        </Text>
 
-        {project.issues.length === 0 ? (
+        {detail.issues.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No open issues</Text>
+            <Text style={styles.emptyTitle}>
+              No open issues
+            </Text>
+
             <Text style={styles.emptyText}>
-              No significant delivery issues are currently recorded.
+              No significant delivery issues are
+              currently recorded.
             </Text>
           </View>
         ) : (
-          project.issues.map((issue) => (
-            <View key={issue.title} style={styles.issueCard}>
+          detail.issues.map((issue) => (
+            <View
+              key={issue.title}
+              style={styles.issueCard}
+            >
               <View style={styles.issueHeader}>
-                <Text style={styles.issueTitle}>{issue.title}</Text>
+                <Text style={styles.issueTitle}>
+                  {issue.title}
+                </Text>
 
                 <View
                   style={[
@@ -415,7 +693,9 @@ export default function ProjectDetailsScreen() {
                 </View>
               </View>
 
-              <Text style={styles.issueDetail}>{issue.detail}</Text>
+              <Text style={styles.issueDetail}>
+                {issue.detail}
+              </Text>
 
               <Text style={styles.issueOwner}>
                 Owner: {issue.owner}
@@ -424,26 +704,37 @@ export default function ProjectDetailsScreen() {
           ))
         )}
 
-        <Text style={styles.sectionTitle}>AI Delivery Insight</Text>
+        <Text style={styles.sectionTitle}>
+          AI Delivery Insight
+        </Text>
 
         <View style={styles.aiCard}>
           <View style={styles.aiHeader}>
             <View style={styles.aiIcon}>
-              <Text style={styles.aiIconText}>AI</Text>
+              <Text style={styles.aiIconText}>
+                AI
+              </Text>
             </View>
 
             <View>
-              <Text style={styles.aiTitle}>DeliveryPulse Insight</Text>
+              <Text style={styles.aiTitle}>
+                DeliveryPulse Insight
+              </Text>
+
               <Text style={styles.aiSubtitle}>
                 Manager-level delivery assessment
               </Text>
             </View>
           </View>
 
-          <Text style={styles.aiText}>{project.aiInsight}</Text>
+          <Text style={styles.aiText}>
+            {detail.aiInsight}
+          </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Delivery Health</Text>
+        <Text style={styles.sectionTitle}>
+          Delivery Health
+        </Text>
 
         <View style={styles.healthCard}>
           <View
@@ -467,7 +758,9 @@ export default function ProjectDetailsScreen() {
                   : 'Delivery is at risk'}
             </Text>
 
-            <Text style={styles.healthText}>{project.risk}</Text>
+            <Text style={styles.healthText}>
+              {project.risk}
+            </Text>
           </View>
         </View>
 
@@ -496,6 +789,19 @@ const styles = StyleSheet.create({
     maxWidth: 900,
     width: '100%',
     alignSelf: 'center',
+  },
+
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.md,
   },
 
   backLink: {
@@ -920,6 +1226,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+
+  errorMessage: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
     marginBottom: spacing.lg,
   },
 

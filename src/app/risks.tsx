@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,9 +11,54 @@ import {
 
 import { colors, radius, spacing } from '../theme';
 import BottomNav from '../components/BottomNav';
-import { risks } from '../data/DeliveryData';
+import {
+  getRisks,
+  Risk,
+} from '../services/api';
 
 export default function RisksScreen() {
+  const [risks, setRisks] = useState<Risk[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadRisks = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const data = await getRisks();
+
+        if (!ignore) {
+          setRisks(data);
+        }
+      } catch (err) {
+        console.error(
+          'Risk loading error:',
+          err
+        );
+
+        if (!ignore) {
+          setError(
+            'Unable to load risks from DeliveryPulse API.'
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadRisks();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   const criticalRisks = risks.filter(
     (risk) => risk.severity === 'Critical'
   ).length;
@@ -23,6 +70,15 @@ export default function RisksScreen() {
   const openRisks = risks.filter(
     (risk) => risk.status === 'Open'
   ).length;
+
+  const openRisk = (riskId: number) => {
+    router.push({
+      pathname: '/risk-details',
+      params: {
+        id: String(riskId),
+      },
+    });
+  };
 
   return (
     <View style={styles.screen}>
@@ -42,13 +98,16 @@ export default function RisksScreen() {
             </Text>
 
             <Text style={styles.subtitle}>
-              Identify and manage delivery risks before they escalate
+              Identify and manage delivery risks before
+              they escalate
             </Text>
           </View>
 
           <Pressable
             style={styles.avatar}
-            onPress={() => router.replace('/login')}
+            onPress={() =>
+              router.replace('/login')
+            }
           >
             <Text style={styles.avatarText}>
               JP
@@ -56,174 +115,237 @@ export default function RisksScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {risks.length}
-            </Text>
+        {loading ? (
+          <View style={styles.stateCard}>
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+            />
 
-            <Text style={styles.summaryLabel}>
-              Total Risks
-            </Text>
-          </View>
-
-          <View style={styles.summaryDivider} />
-
-          <View style={styles.summaryItem}>
-            <Text
-              style={[
-                styles.summaryValue,
-                styles.summaryDanger,
-              ]}
-            >
-              {criticalRisks + highRisks}
-            </Text>
-
-            <Text style={styles.summaryLabel}>
-              High Priority
+            <Text style={styles.stateText}>
+              Loading risks...
             </Text>
           </View>
-
-          <View style={styles.summaryDivider} />
-
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {openRisks}
+        ) : error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorTitle}>
+              Unable to load risks
             </Text>
 
-            <Text style={styles.summaryLabel}>
-              Open
+            <Text style={styles.errorText}>
+              {error}
             </Text>
           </View>
-        </View>
-
-        {criticalRisks > 0 && (
-          <View style={styles.criticalBanner}>
-            <View style={styles.criticalIcon}>
-              <Text style={styles.criticalIconText}>
-                !
-              </Text>
-            </View>
-
-            <View style={styles.criticalContent}>
-              <Text style={styles.criticalTitle}>
-                Immediate attention required
-              </Text>
-
-              <Text style={styles.criticalText}>
-                {criticalRisks} critical delivery risk
-                {criticalRisks > 1 ? 's are' : ' is'} currently active.
-              </Text>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            Active Delivery Risks
-          </Text>
-
-          <Text style={styles.riskCount}>
-            {risks.length} risks
-          </Text>
-        </View>
-
-        {risks.map((risk) => (
-          <Pressable
-            key={risk.id}
-            style={({ pressed }) => [
-              styles.riskCard,
-              pressed && styles.riskCardPressed,
-            ]}
-            onPress={() =>
-              router.push({
-                pathname: '/risk-details',
-                params: {
-                  id: risk.id,
-                },
-              })
-            }
-          >
-            <View style={styles.riskTopRow}>
-              <View style={styles.riskIdentity}>
-                <Text style={styles.riskId}>
-                  {risk.id}
+        ) : (
+          <>
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>
+                  {risks.length}
                 </Text>
 
-                <Text style={styles.riskTitle}>
-                  {risk.title}
-                </Text>
-
-                <Text style={styles.riskProject}>
-                  {risk.project}
+                <Text style={styles.summaryLabel}>
+                  Total Risks
                 </Text>
               </View>
 
-              <View
-                style={[
-                  styles.severityBadge,
-                  risk.severity === 'Critical' &&
-                    styles.dangerBackground,
-                  risk.severity === 'High' &&
-                    styles.dangerBackground,
-                  risk.severity === 'Medium' &&
-                    styles.warningBackground,
-                  risk.severity === 'Low' &&
-                    styles.successBackground,
-                ]}
-              >
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryItem}>
                 <Text
                   style={[
-                    styles.severityText,
-                    (risk.severity === 'Critical' ||
-                      risk.severity === 'High') &&
-                      styles.dangerText,
-                    risk.severity === 'Medium' &&
-                      styles.warningText,
-                    risk.severity === 'Low' &&
-                      styles.successText,
+                    styles.summaryValue,
+                    styles.summaryDanger,
                   ]}
                 >
-                  {risk.severity}
+                  {criticalRisks + highRisks}
+                </Text>
+
+                <Text style={styles.summaryLabel}>
+                  High Priority
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>
+                  {openRisks}
+                </Text>
+
+                <Text style={styles.summaryLabel}>
+                  Open
                 </Text>
               </View>
             </View>
 
-            <View style={styles.metaRow}>
-              <View>
-                <Text style={styles.metaLabel}>
-                  Owner
-                </Text>
+            {criticalRisks > 0 && (
+              <View style={styles.criticalBanner}>
+                <View style={styles.criticalIcon}>
+                  <Text
+                    style={
+                      styles.criticalIconText
+                    }
+                  >
+                    !
+                  </Text>
+                </View>
 
-                <Text style={styles.metaValue}>
-                  {risk.owner}
-                </Text>
+                <View
+                  style={styles.criticalContent}
+                >
+                  <Text
+                    style={styles.criticalTitle}
+                  >
+                    Immediate attention required
+                  </Text>
+
+                  <Text
+                    style={styles.criticalText}
+                  >
+                    {criticalRisks} critical delivery
+                    risk
+                    {criticalRisks > 1
+                      ? 's are'
+                      : ' is'}{' '}
+                    currently active.
+                  </Text>
+                </View>
               </View>
+            )}
 
-              <View>
-                <Text style={styles.metaLabel}>
-                  Status
-                </Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                Active Delivery Risks
+              </Text>
 
-                <Text style={styles.metaValue}>
-                  {risk.status}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.riskDescriptionBox}>
-              <Text style={styles.descriptionText}>
-                {risk.description}
+              <Text style={styles.riskCount}>
+                {risks.length} risks
               </Text>
             </View>
 
-            <View style={styles.cardFooter}>
-              <Text style={styles.viewText}>
-                View risk details ›
-              </Text>
-            </View>
-          </Pressable>
-        ))}
+            {risks.map((risk) => (
+              <Pressable
+                key={risk.id}
+                style={({ pressed }) => [
+                  styles.riskCard,
+                  pressed &&
+                    styles.riskCardPressed,
+                ]}
+                onPress={() =>
+                  openRisk(risk.id)
+                }
+              >
+                <View style={styles.riskTopRow}>
+                  <View
+                    style={styles.riskIdentity}
+                  >
+                    <Text style={styles.riskId}>
+                      {risk.id}
+                    </Text>
+
+                    <Text
+                      style={styles.riskTitle}
+                    >
+                      {risk.title}
+                    </Text>
+
+                    <Text
+                      style={styles.riskProject}
+                    >
+                      {risk.project}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.severityBadge,
+                      risk.severity ===
+                        'Critical' &&
+                        styles.dangerBackground,
+                      risk.severity === 'High' &&
+                        styles.dangerBackground,
+                      risk.severity ===
+                        'Medium' &&
+                        styles.warningBackground,
+                      risk.severity === 'Low' &&
+                        styles.successBackground,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.severityText,
+                        (risk.severity ===
+                          'Critical' ||
+                          risk.severity ===
+                            'High') &&
+                          styles.dangerText,
+                        risk.severity ===
+                          'Medium' &&
+                          styles.warningText,
+                        risk.severity ===
+                          'Low' &&
+                          styles.successText,
+                      ]}
+                    >
+                      {risk.severity}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <View>
+                    <Text
+                      style={styles.metaLabel}
+                    >
+                      Owner
+                    </Text>
+
+                    <Text
+                      style={styles.metaValue}
+                    >
+                      {risk.owner}
+                    </Text>
+                  </View>
+
+                  <View>
+                    <Text
+                      style={styles.metaLabel}
+                    >
+                      Status
+                    </Text>
+
+                    <Text
+                      style={styles.metaValue}
+                    >
+                      {risk.status}
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={
+                    styles.riskDescriptionBox
+                  }
+                >
+                  <Text
+                    style={
+                      styles.descriptionText
+                    }
+                  >
+                    {risk.description}
+                  </Text>
+                </View>
+
+                <View style={styles.cardFooter}>
+                  <Text style={styles.viewText}>
+                    View risk details ›
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </>
+        )}
 
         <View style={styles.bottomSpace} />
       </ScrollView>
@@ -293,6 +415,44 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 14,
+  },
+
+  stateCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+
+  stateText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.md,
+  },
+
+  errorCard: {
+    backgroundColor: colors.dangerBackground,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+
+  errorTitle: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 5,
+  },
+
+  errorText: {
+    color: colors.text,
+    fontSize: 12,
+    lineHeight: 18,
   },
 
   summaryCard: {

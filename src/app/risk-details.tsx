@@ -1,5 +1,10 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
+  router,
+  useLocalSearchParams,
+} from 'expo-router';
+import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,19 +14,110 @@ import {
 
 import { colors, radius, spacing } from '../theme';
 import BottomNav from '../components/BottomNav';
-import { risks } from '../data/DeliveryData';
+import {
+  getRisks,
+  Risk,
+} from '../services/api';
 
 export default function RiskDetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{
+    id?: string | string[];
+  }>();
 
-  const risk = risks.find((item) => item.id === Number(id));
+  const riskId = Number(
+    Array.isArray(id) ? id[0] : id
+  );
 
-  if (!risk) {
+  const [risk, setRisk] =
+    useState<Risk | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState('');
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadRisk = async () => {
+      if (!riskId || Number.isNaN(riskId)) {
+        setError('Risk ID was not provided.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError('');
+
+        const risks = await getRisks();
+
+        const selectedRisk = risks.find(
+          (item) => item.id === riskId
+        );
+
+        if (!ignore) {
+          if (!selectedRisk) {
+            setError('Risk not found.');
+          } else {
+            setRisk(selectedRisk);
+          }
+        }
+      } catch (err) {
+        console.error(
+          'Risk details loading error:',
+          err
+        );
+
+        if (!ignore) {
+          setError(
+            'Unable to load risk details from DeliveryPulse API.'
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadRisk();
+
+    return () => {
+      ignore = true;
+    };
+  }, [riskId]);
+
+  if (loading) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator
+            size="small"
+            color={colors.primary}
+          />
+
+          <Text style={styles.loadingText}>
+            Loading risk details...
+          </Text>
+        </View>
+
+        <BottomNav />
+      </View>
+    );
+  }
+
+  if (error || !risk) {
     return (
       <View style={styles.screen}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>
             Risk not found
+          </Text>
+
+          <Text style={styles.errorMessage}>
+            {error}
           </Text>
 
           <Pressable
@@ -39,15 +135,14 @@ export default function RiskDetailsScreen() {
     );
   }
 
-  const isDanger =
-    risk.severity === 'Critical' ||
-    risk.severity === 'High';
-
-  const isWarning =
-    risk.severity === 'Medium';
-
-  const isSuccess =
-    risk.severity === 'Low';
+  const severityDescription =
+    risk.severity === 'Critical'
+      ? 'Immediate management intervention is required.'
+      : risk.severity === 'High'
+        ? 'This risk requires active management attention.'
+        : risk.severity === 'Medium'
+          ? 'This risk should remain under regular monitoring.'
+          : 'This risk currently has limited delivery impact.';
 
   return (
     <View style={styles.screen}>
@@ -66,16 +161,16 @@ export default function RiskDetailsScreen() {
         </Pressable>
 
         <View style={styles.header}>
-          <View style={styles.headerContent}>
+          <View style={styles.headerText}>
             <Text style={styles.eyebrow}>
-              RISK R-{String(risk.id).padStart(3, '0')}
+              DELIVERY RISK
             </Text>
 
             <Text style={styles.title}>
               {risk.title}
             </Text>
 
-            <Text style={styles.project}>
+            <Text style={styles.subtitle}>
               {risk.project}
             </Text>
           </View>
@@ -83,17 +178,25 @@ export default function RiskDetailsScreen() {
           <View
             style={[
               styles.severityBadge,
-              isDanger && styles.dangerBackground,
-              isWarning && styles.warningBackground,
-              isSuccess && styles.successBackground,
+              (risk.severity === 'Critical' ||
+                risk.severity === 'High') &&
+                styles.dangerBackground,
+              risk.severity === 'Medium' &&
+                styles.warningBackground,
+              risk.severity === 'Low' &&
+                styles.successBackground,
             ]}
           >
             <Text
               style={[
                 styles.severityText,
-                isDanger && styles.dangerText,
-                isWarning && styles.warningText,
-                isSuccess && styles.successText,
+                (risk.severity === 'Critical' ||
+                  risk.severity === 'High') &&
+                  styles.dangerText,
+                risk.severity === 'Medium' &&
+                  styles.warningText,
+                risk.severity === 'Low' &&
+                  styles.successText,
               ]}
             >
               {risk.severity}
@@ -101,23 +204,25 @@ export default function RiskDetailsScreen() {
           </View>
         </View>
 
-        <View style={styles.statusCard}>
-          <View>
-            <Text style={styles.statusLabel}>
-              CURRENT STATUS
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>
+              STATUS
             </Text>
 
-            <Text style={styles.statusValue}>
+            <Text style={styles.summaryValue}>
               {risk.status}
             </Text>
           </View>
 
-          <View style={styles.statusRight}>
-            <Text style={styles.statusLabel}>
-              RISK OWNER
+          <View style={styles.summaryDivider} />
+
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>
+              OWNER
             </Text>
 
-            <Text style={styles.statusOwner}>
+            <Text style={styles.summaryValue}>
               {risk.owner}
             </Text>
           </View>
@@ -127,54 +232,95 @@ export default function RiskDetailsScreen() {
           Risk Description
         </Text>
 
-        <View style={styles.contentCard}>
+        <View style={styles.card}>
           <Text style={styles.bodyText}>
             {risk.description}
           </Text>
         </View>
 
         <Text style={styles.sectionTitle}>
-          Potential Impact
+          Recommended Action
         </Text>
 
-        <View style={styles.impactCard}>
-          <View style={styles.impactIcon}>
-            <Text style={styles.impactIconText}>
-              !
-            </Text>
-          </View>
-
-          <Text style={styles.impactText}>
-            {risk.severity === 'Critical'
-              ? 'Potential impact to major project milestones and dependent delivery activities.'
-              : risk.severity === 'High'
-              ? 'Potential impact to delivery timeline, quality, or team capacity if not addressed.'
-              : risk.severity === 'Medium'
-              ? 'Potential impact to delivery efficiency and available execution time.'
-              : 'Low current impact; continued monitoring is required until the risk is closed.'}
-          </Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>
-          Recommended Mitigation
-        </Text>
-
-        <View style={styles.mitigationCard}>
-          <View style={styles.mitigationIcon}>
-            <Text style={styles.mitigationIconText}>
+        <View style={styles.actionCard}>
+          <View style={styles.actionIcon}>
+            <Text style={styles.actionIconText}>
               →
             </Text>
           </View>
 
-          <View style={styles.mitigationContent}>
-            <Text style={styles.mitigationTitle}>
-              Delivery Manager Action
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>
+              Management Action
             </Text>
 
-            <Text style={styles.mitigationText}>
+            <Text style={styles.actionText}>
               {risk.action}
             </Text>
           </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>
+          Delivery Assessment
+        </Text>
+
+        <View style={styles.assessmentCard}>
+          <View
+            style={[
+              styles.assessmentIndicator,
+              (risk.severity === 'Critical' ||
+                risk.severity === 'High') &&
+                styles.dangerIndicator,
+              risk.severity === 'Medium' &&
+                styles.warningIndicator,
+              risk.severity === 'Low' &&
+                styles.successIndicator,
+            ]}
+          />
+
+          <View style={styles.assessmentContent}>
+            <Text style={styles.assessmentTitle}>
+              {risk.severity} delivery risk
+            </Text>
+
+            <Text style={styles.assessmentText}>
+              {severityDescription}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>
+          DeliveryPulse Insight
+        </Text>
+
+        <View style={styles.insightCard}>
+          <View style={styles.insightHeader}>
+            <View style={styles.insightIcon}>
+              <Text style={styles.insightIconText}>
+                AI
+              </Text>
+            </View>
+
+            <View>
+              <Text style={styles.insightTitle}>
+                Manager-level assessment
+              </Text>
+
+              <Text style={styles.insightSubtitle}>
+                Based on current delivery data
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.insightText}>
+            {risk.severity === 'Critical'
+              ? `${risk.title} represents an immediate delivery concern for ${risk.project}. The priority should be to execute the recommended mitigation action and track closure closely until the risk is reduced.`
+              : risk.severity === 'High'
+                ? `${risk.title} requires active management attention on ${risk.project}. The recommended action should be tracked against the next delivery milestone to prevent escalation.`
+                : risk.severity === 'Medium'
+                  ? `${risk.title} should remain under regular monitoring for ${risk.project}. Management intervention may be required if the likelihood or delivery impact increases.`
+                  : `${risk.title} currently represents limited delivery impact for ${risk.project}. Continue monitoring while maintaining focus on higher-priority portfolio risks.`}
+          </Text>
         </View>
 
         <View style={styles.bottomSpace} />
@@ -204,6 +350,19 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
 
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.md,
+  },
+
   backLink: {
     alignSelf: 'flex-start',
     marginBottom: spacing.lg,
@@ -222,40 +381,40 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
 
-  headerContent: {
+  headerText: {
     flex: 1,
     marginRight: spacing.md,
   },
 
   eyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
     marginBottom: 5,
   },
 
   title: {
-    color: colors.text,
-    fontSize: 25,
+    fontSize: 26,
     fontWeight: '800',
+    color: colors.text,
   },
 
-  project: {
+  subtitle: {
+    fontSize: 14,
     color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 4,
+    marginTop: 5,
   },
 
   severityBadge: {
     borderRadius: radius.pill,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 7,
     marginTop: 4,
   },
 
   severityText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
   },
 
@@ -283,16 +442,21 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
 
-  statusCard: {
+  summaryCard: {
     backgroundColor: colors.primaryDark,
     borderRadius: radius.lg,
     padding: spacing.lg,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.xl,
   },
 
-  statusLabel: {
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+
+  summaryLabel: {
     color: '#DBEAFE',
     fontSize: 10,
     fontWeight: '700',
@@ -300,31 +464,28 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
 
-  statusValue: {
+  summaryValue: {
     color: colors.surface,
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: '800',
+    textAlign: 'center',
   },
 
-  statusRight: {
-    alignItems: 'flex-end',
-  },
-
-  statusOwner: {
-    color: colors.surface,
-    fontSize: 13,
-    fontWeight: '700',
+  summaryDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: '#FFFFFF33',
   },
 
   sectionTitle: {
-    color: colors.text,
     fontSize: 19,
     fontWeight: '700',
+    color: colors.text,
     marginBottom: spacing.md,
     marginTop: spacing.sm,
   },
 
-  contentCard: {
+  card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -336,53 +497,20 @@ const styles = StyleSheet.create({
   bodyText: {
     color: colors.textSecondary,
     fontSize: 13,
-    lineHeight: 21,
-  },
-
-  impactCard: {
-    backgroundColor: colors.dangerBackground,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-
-  impactIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-
-  impactIconText: {
-    color: colors.surface,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  impactText: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 13,
     lineHeight: 20,
   },
 
-  mitigationCard: {
+  actionCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
     flexDirection: 'row',
+    marginBottom: spacing.xl,
   },
 
-  mitigationIcon: {
+  actionIcon: {
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -392,25 +520,120 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
 
-  mitigationIconText: {
+  actionIconText: {
     color: colors.primary,
     fontSize: 20,
     fontWeight: '700',
   },
 
-  mitigationContent: {
+  actionContent: {
     flex: 1,
   },
 
-  mitigationTitle: {
+  actionTitle: {
     color: colors.text,
     fontSize: 14,
     fontWeight: '800',
     marginBottom: 6,
   },
 
-  mitigationText: {
+  actionText: {
     color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+
+  assessmentCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    flexDirection: 'row',
+    marginBottom: spacing.xl,
+  },
+
+  assessmentIndicator: {
+    width: 5,
+    borderRadius: 3,
+    backgroundColor: colors.success,
+    marginRight: spacing.md,
+  },
+
+  dangerIndicator: {
+    backgroundColor: colors.danger,
+  },
+
+  warningIndicator: {
+    backgroundColor: colors.warning,
+  },
+
+  successIndicator: {
+    backgroundColor: colors.success,
+  },
+
+  assessmentContent: {
+    flex: 1,
+  },
+
+  assessmentTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 5,
+  },
+
+  assessmentText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  insightCard: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+
+  insightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+
+  insightIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+
+  insightIconText: {
+    color: colors.surface,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  insightTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  insightSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    marginTop: 2,
+  },
+
+  insightText: {
+    color: colors.text,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -426,6 +649,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+
+  errorMessage: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
     marginBottom: spacing.lg,
   },
 

@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,28 +11,74 @@ import {
 
 import { colors, radius, spacing } from '../theme';
 import BottomNav from '../components/BottomNav';
-import { projects } from '../data/DeliveryData';
+import {
+  getProjects,
+  Project,
+} from '../services/api';
 
 export default function ProjectsScreen() {
-  const averageProgress = Math.round(
-    projects.reduce(
-      (total, project) => total + project.progress,
-      0
-    ) / projects.length
-  );
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadProjects = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const data = await getProjects();
+
+        if (!ignore) {
+          setProjects(data);
+        }
+      } catch (err) {
+        console.error('Project loading error:', err);
+
+        if (!ignore) {
+          setError(
+            'Unable to load projects from DeliveryPulse API.'
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadProjects();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const averageProgress =
+    projects.length > 0
+      ? Math.round(
+          projects.reduce(
+            (total, project) =>
+              total + project.progress,
+            0
+          ) / projects.length
+        )
+      : 0;
 
   const atRiskCount = projects.filter(
     (project) => project.status === 'At Risk'
   ).length;
 
- const openProject = (projectName: string) => {
-  router.push({
-    pathname: '/project-details',
-    params: {
-      name: projectName,
-    },
-  });
-};
+  const openProject = (projectName: string) => {
+    router.push({
+      pathname: '/project-details',
+      params: {
+        name: projectName,
+      },
+    });
+  };
 
   return (
     <View style={styles.screen}>
@@ -64,159 +112,198 @@ export default function ProjectsScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {projects.length}
-            </Text>
+        {loading ? (
+          <View style={styles.stateCard}>
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+            />
 
-            <Text style={styles.summaryLabel}>
-              Active
-            </Text>
-          </View>
-
-          <View style={styles.summaryDivider} />
-
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {atRiskCount}
-            </Text>
-
-            <Text style={styles.summaryLabel}>
-              At Risk
+            <Text style={styles.stateText}>
+              Loading projects...
             </Text>
           </View>
-
-          <View style={styles.summaryDivider} />
-
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {averageProgress}%
+        ) : error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorTitle}>
+              Unable to load projects
             </Text>
 
-            <Text style={styles.summaryLabel}>
-              Avg. Progress
+            <Text style={styles.errorText}>
+              {error}
             </Text>
           </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            All Projects
-          </Text>
-
-          <Text style={styles.projectCount}>
-            {projects.length} projects
-          </Text>
-        </View>
-
-        {projects.map((project) => (
-          <Pressable
-            key={project.name}
-            style={({ pressed }) => [
-              styles.projectCard,
-              pressed && styles.projectCardPressed,
-            ]}
-            onPress={() => openProject(project.name)}
-          >
-            <View style={styles.projectTopRow}>
-              <View style={styles.projectInfo}>
-                <Text style={styles.projectName}>
-                  {project.name}
+        ) : (
+          <>
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>
+                  {projects.length}
                 </Text>
 
-                <Text style={styles.projectClient}>
-                  {project.client}
+                <Text style={styles.summaryLabel}>
+                  Active
                 </Text>
               </View>
 
-              <View
-                style={[
-                  styles.statusBadge,
-                  project.statusType === 'danger' &&
-                    styles.dangerBackground,
-                  project.statusType === 'warning' &&
-                    styles.warningBackground,
-                  project.statusType === 'success' &&
-                    styles.successBackground,
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>
+                  {atRiskCount}
+                </Text>
+
+                <Text style={styles.summaryLabel}>
+                  At Risk
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>
+                  {averageProgress}%
+                </Text>
+
+                <Text style={styles.summaryLabel}>
+                  Avg. Progress
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                All Projects
+              </Text>
+
+              <Text style={styles.projectCount}>
+                {projects.length} projects
+              </Text>
+            </View>
+
+            {projects.map((project) => (
+              <Pressable
+                key={project.id}
+                style={({ pressed }) => [
+                  styles.projectCard,
+                  pressed &&
+                    styles.projectCardPressed,
                 ]}
+                onPress={() =>
+                  openProject(project.name)
+                }
               >
-                <Text
-                  style={[
-                    styles.statusText,
-                    project.statusType === 'danger' &&
-                      styles.dangerText,
-                    project.statusType === 'warning' &&
-                      styles.warningText,
-                    project.statusType === 'success' &&
-                      styles.successText,
-                  ]}
+                <View style={styles.projectTopRow}>
+                  <View style={styles.projectInfo}>
+                    <Text style={styles.projectName}>
+                      {project.name}
+                    </Text>
+
+                    <Text style={styles.projectClient}>
+                      {project.client}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      project.statusType ===
+                        'danger' &&
+                        styles.dangerBackground,
+                      project.statusType ===
+                        'warning' &&
+                        styles.warningBackground,
+                      project.statusType ===
+                        'success' &&
+                        styles.successBackground,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        project.statusType ===
+                          'danger' &&
+                          styles.dangerText,
+                        project.statusType ===
+                          'warning' &&
+                          styles.warningText,
+                        project.statusType ===
+                          'success' &&
+                          styles.successText,
+                      ]}
+                    >
+                      {project.status}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <View>
+                    <Text style={styles.metaLabel}>
+                      Owner
+                    </Text>
+
+                    <Text style={styles.metaValue}>
+                      {project.owner}
+                    </Text>
+                  </View>
+
+                  <View>
+                    <Text style={styles.metaLabel}>
+                      Target
+                    </Text>
+
+                    <Text style={styles.metaValue}>
+                      {project.target}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressLabel}>
+                    Delivery progress
+                  </Text>
+
+                  <Text style={styles.progressValue}>
+                    {project.progress}%
+                  </Text>
+                </View>
+
+                <View
+                  style={styles.progressBackground}
                 >
-                  {project.status}
-                </Text>
-              </View>
-            </View>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: `${project.progress}%`,
+                      },
+                      project.statusType ===
+                        'danger' &&
+                        styles.dangerBar,
+                      project.statusType ===
+                        'warning' &&
+                        styles.warningBar,
+                      project.statusType ===
+                        'success' &&
+                        styles.successBar,
+                    ]}
+                  />
+                </View>
 
-            <View style={styles.metaRow}>
-              <View>
-                <Text style={styles.metaLabel}>
-                  Owner
-                </Text>
+                <View style={styles.cardFooter}>
+                  <Text style={styles.riskText}>
+                    {project.risk}
+                  </Text>
 
-                <Text style={styles.metaValue}>
-                  {project.owner}
-                </Text>
-              </View>
-
-              <View>
-                <Text style={styles.metaLabel}>
-                  Target
-                </Text>
-
-                <Text style={styles.metaValue}>
-                  {project.target}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>
-                Delivery progress
-              </Text>
-
-              <Text style={styles.progressValue}>
-                {project.progress}%
-              </Text>
-            </View>
-
-            <View style={styles.progressBackground}>
-              <View
-                style={[
-                  styles.progressBar,
-                  {
-                    width: `${project.progress}%`,
-                  },
-                  project.statusType === 'danger' &&
-                    styles.dangerBar,
-                  project.statusType === 'warning' &&
-                    styles.warningBar,
-                  project.statusType === 'success' &&
-                    styles.successBar,
-                ]}
-              />
-            </View>
-
-            <View style={styles.cardFooter}>
-              <Text style={styles.riskText}>
-                {project.risk}
-              </Text>
-
-              <Text style={styles.viewText}>
-                View ›
-              </Text>
-            </View>
-          </Pressable>
-        ))}
+                  <Text style={styles.viewText}>
+                    View ›
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </>
+        )}
 
         <View style={styles.bottomSpace} />
       </ScrollView>
@@ -285,6 +372,44 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 14,
+  },
+
+  stateCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+
+  stateText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.md,
+  },
+
+  errorCard: {
+    backgroundColor: colors.dangerBackground,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+
+  errorTitle: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 5,
+  },
+
+  errorText: {
+    color: colors.text,
+    fontSize: 12,
+    lineHeight: 18,
   },
 
   summaryCard: {

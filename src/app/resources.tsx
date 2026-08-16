@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,99 +11,77 @@ import {
 
 import { colors, radius, spacing } from '../theme';
 import BottomNav from '../components/BottomNav';
-
-const resources = [
-  {
-    name: 'Arjun Mehta',
-    role: 'Senior Engineer',
-    utilization: 112,
-    project: 'Project Phoenix',
-    allocation: '112%',
-    status: 'Overallocated',
-    statusType: 'danger',
-  },
-  {
-    name: 'Neha Shah',
-    role: 'Business Analyst',
-    utilization: 94,
-    project: 'Project Atlas',
-    allocation: '94%',
-    status: 'Healthy',
-    statusType: 'success',
-  },
-  {
-    name: 'Rahul Patel',
-    role: 'Mobile Engineer',
-    utilization: 86,
-    project: 'Project Nova',
-    allocation: '86%',
-    status: 'Healthy',
-    statusType: 'success',
-  },
-  {
-    name: 'Priya Desai',
-    role: 'Data Engineer',
-    utilization: 101,
-    project: 'Project Orion',
-    allocation: '101%',
-    status: 'Overallocated',
-    statusType: 'danger',
-  },
-  {
-    name: 'Vivek Shah',
-    role: 'Cloud Engineer',
-    utilization: 78,
-    project: 'Project Horizon',
-    allocation: '78%',
-    status: 'Available',
-    statusType: 'warning',
-  },
-  {
-    name: 'Karan Mehta',
-    role: 'AI Engineer',
-    utilization: 69,
-    project: 'Project Vertex',
-    allocation: '69%',
-    status: 'Available',
-    statusType: 'warning',
-  },
-  {
-    name: 'Anjali Patel',
-    role: 'QA Engineer',
-    utilization: 62,
-    project: 'Project Atlas',
-    allocation: '62%',
-    status: 'Available',
-    statusType: 'warning',
-  },
-  {
-    name: 'Rohan Shah',
-    role: 'DevOps Engineer',
-    utilization: 88,
-    project: 'Project Phoenix',
-    allocation: '88%',
-    status: 'Healthy',
-    statusType: 'success',
-  },
-];
+import {
+  getResources,
+  Resource,
+} from '../services/api';
 
 export default function ResourcesScreen() {
-  const totalResources = resources.length;
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const overallocated = resources.filter(
-    (resource) => resource.utilization > 100
+  useEffect(() => {
+    let ignore = false;
+
+    const loadResources = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const data = await getResources();
+
+        if (!ignore) {
+          setResources(data);
+        }
+      } catch (err) {
+        console.error(
+          'Resource loading error:',
+          err
+        );
+
+        if (!ignore) {
+          setError(
+            'Unable to load resources from DeliveryPulse API.'
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadResources();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const overloadedCount = resources.filter(
+    (resource) => resource.status === 'Overloaded'
   ).length;
 
-  const averageUtilization = Math.round(
-    resources.reduce(
-      (total, resource) => total + resource.utilization,
-      0
-    ) / resources.length
-  );
+  const averageAllocation =
+    resources.length > 0
+      ? Math.round(
+          resources.reduce(
+            (total, resource) =>
+              total + resource.allocation,
+            0
+          ) / resources.length
+        )
+      : 0;
 
-  const availableCapacity = resources.filter(
-    (resource) => resource.utilization < 80
-  ).length;
+  const openResource = (resourceId: number) => {
+    router.push({
+      pathname: '/resource-details',
+      params: {
+        id: String(resourceId),
+      },
+    });
+  };
 
   return (
     <View style={styles.screen}>
@@ -112,10 +92,16 @@ export default function ResourcesScreen() {
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.eyebrow}>DELIVERY CAPACITY</Text>
-            <Text style={styles.title}>Resources</Text>
+            <Text style={styles.eyebrow}>
+              RESOURCE MANAGEMENT
+            </Text>
+
+            <Text style={styles.title}>
+              Resources
+            </Text>
+
             <Text style={styles.subtitle}>
-              Monitor team utilization and delivery capacity
+              Monitor team capacity and allocation
             </Text>
           </View>
 
@@ -123,195 +109,220 @@ export default function ResourcesScreen() {
             style={styles.avatar}
             onPress={() => router.replace('/login')}
           >
-            <Text style={styles.avatarText}>JP</Text>
+            <Text style={styles.avatarText}>
+              JP
+            </Text>
           </Pressable>
         </View>
 
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {totalResources}
+        {loading ? (
+          <View style={styles.stateCard}>
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+            />
+
+            <Text style={styles.stateText}>
+              Loading resources...
             </Text>
-            <Text style={styles.summaryLabel}>Team</Text>
           </View>
-
-          <View style={styles.summaryDivider} />
-
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {averageUtilization}%
+        ) : error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorTitle}>
+              Unable to load resources
             </Text>
-            <Text style={styles.summaryLabel}>Avg. Utilization</Text>
-          </View>
 
-          <View style={styles.summaryDivider} />
-
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {availableCapacity}
+            <Text style={styles.errorText}>
+              {error}
             </Text>
-            <Text style={styles.summaryLabel}>Available</Text>
           </View>
-        </View>
+        ) : (
+          <>
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>
+                  {resources.length}
+                </Text>
 
-        {overallocated > 0 && (
-          <View style={styles.alertCard}>
-            <View style={styles.alertIcon}>
-              <Text style={styles.alertIconText}>!</Text>
+                <Text style={styles.summaryLabel}>
+                  Resources
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>
+                  {overloadedCount}
+                </Text>
+
+                <Text style={styles.summaryLabel}>
+                  Overloaded
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>
+                  {averageAllocation}%
+                </Text>
+
+                <Text style={styles.summaryLabel}>
+                  Avg. Allocation
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.alertContent}>
-              <Text style={styles.alertTitle}>
-                Capacity attention required
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                Team Resources
               </Text>
 
-              <Text style={styles.alertText}>
-                {overallocated} team member
-                {overallocated > 1 ? 's are' : ' is'} currently
-                allocated above 100%.
+              <Text style={styles.resourceCount}>
+                {resources.length} resources
               </Text>
             </View>
-          </View>
+
+            {resources.map((resource) => (
+              <Pressable
+                key={resource.id}
+                style={({ pressed }) => [
+                  styles.resourceCard,
+                  pressed &&
+                    styles.resourceCardPressed,
+                ]}
+                onPress={() =>
+                  openResource(resource.id)
+                }
+              >
+                <View style={styles.resourceTopRow}>
+                  <View style={styles.resourceInfo}>
+                    <Text style={styles.resourceName}>
+                      {resource.name}
+                    </Text>
+
+                    <Text style={styles.resourceRole}>
+                      {resource.role}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      resource.status ===
+                        'Overloaded' &&
+                        styles.dangerBackground,
+                      resource.status ===
+                        'Allocated' &&
+                        styles.warningBackground,
+                      resource.status ===
+                        'Available' &&
+                        styles.successBackground,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        resource.status ===
+                          'Overloaded' &&
+                          styles.dangerText,
+                        resource.status ===
+                          'Allocated' &&
+                          styles.warningText,
+                        resource.status ===
+                          'Available' &&
+                          styles.successText,
+                      ]}
+                    >
+                      {resource.status}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaLabel}>
+                      Project
+                    </Text>
+
+                    <Text style={styles.metaValue}>
+                      {resource.project}
+                    </Text>
+                  </View>
+
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaLabel}>
+                      Capacity
+                    </Text>
+
+                    <Text style={styles.metaValue}>
+                      {resource.capacity}%
+                    </Text>
+                  </View>
+
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaLabel}>
+                      Allocation
+                    </Text>
+
+                    <Text style={styles.metaValue}>
+                      {resource.allocation}%
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressLabel}>
+                    Allocation
+                  </Text>
+
+                  <Text style={styles.progressValue}>
+                    {resource.allocation}%
+                  </Text>
+                </View>
+
+                <View
+                  style={styles.progressBackground}
+                >
+                  <View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: `${Math.min(
+                          resource.allocation,
+                          100
+                        )}%`,
+                      },
+                      resource.status ===
+                        'Overloaded' &&
+                        styles.dangerBar,
+                      resource.status ===
+                        'Allocated' &&
+                        styles.warningBar,
+                      resource.status ===
+                        'Available' &&
+                        styles.successBar,
+                    ]}
+                  />
+                </View>
+
+                <View style={styles.cardFooter}>
+                  <Text style={styles.capacityText}>
+                    {resource.allocation >
+                    resource.capacity
+                      ? `${resource.allocation - resource.capacity}% above capacity`
+                      : `${resource.capacity - resource.allocation}% capacity available`}
+                  </Text>
+
+                  <Text style={styles.viewText}>
+                    View ›
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </>
         )}
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Team Capacity</Text>
-          <Text style={styles.resourceCount}>
-            {totalResources} resources
-          </Text>
-        </View>
-
-        {resources.map((resource) => (
-          <Pressable
-            key={resource.name}
-            style={({ pressed }) => [
-              styles.resourceCard,
-              pressed && styles.resourceCardPressed,
-            ]}
-            onPress={() =>
-              router.push({
-                pathname: '/resource-details',
-                params: {
-                  name: resource.name,
-                },
-              })
-            }
-          >
-            <View style={styles.resourceTopRow}>
-              <View style={styles.resourceIdentity}>
-                <View style={styles.resourceAvatar}>
-                  <Text style={styles.resourceAvatarText}>
-                    {resource.name
-                      .split(' ')
-                      .map((part) => part[0])
-                      .join('')}
-                  </Text>
-                </View>
-
-                <View style={styles.resourceInfo}>
-                  <Text style={styles.resourceName}>
-                    {resource.name}
-                  </Text>
-
-                  <Text style={styles.resourceRole}>
-                    {resource.role}
-                  </Text>
-                </View>
-              </View>
-
-              <View
-                style={[
-                  styles.statusBadge,
-                  resource.statusType === 'danger' &&
-                    styles.dangerBackground,
-                  resource.statusType === 'success' &&
-                    styles.successBackground,
-                  resource.statusType === 'warning' &&
-                    styles.warningBackground,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusText,
-                    resource.statusType === 'danger' &&
-                      styles.dangerText,
-                    resource.statusType === 'success' &&
-                      styles.successText,
-                    resource.statusType === 'warning' &&
-                      styles.warningText,
-                  ]}
-                >
-                  {resource.status}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.projectRow}>
-              <View>
-                <Text style={styles.metaLabel}>Current Project</Text>
-                <Text style={styles.metaValue}>
-                  {resource.project}
-                </Text>
-              </View>
-
-              <View style={styles.allocationContainer}>
-                <Text style={styles.metaLabel}>Allocation</Text>
-                <Text
-                  style={[
-                    styles.allocationValue,
-                    resource.utilization > 100 &&
-                      styles.dangerText,
-                  ]}
-                >
-                  {resource.allocation}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>
-                Utilization
-              </Text>
-
-              <Text
-                style={[
-                  styles.progressValue,
-                  resource.utilization > 100 &&
-                    styles.dangerText,
-                ]}
-              >
-                {resource.utilization}%
-              </Text>
-            </View>
-
-            <View style={styles.progressBackground}>
-              <View
-                style={[
-                  styles.progressBar,
-                  {
-                    width: `${Math.min(
-                      resource.utilization,
-                      100
-                    )}%`,
-                  },
-                  resource.utilization > 100 &&
-                    styles.dangerBar,
-                  resource.utilization >= 80 &&
-                    resource.utilization <= 100 &&
-                    styles.successBar,
-                  resource.utilization < 80 &&
-                    styles.warningBar,
-                ]}
-              />
-            </View>
-
-            <View style={styles.viewRow}>
-              <Text style={styles.viewText}>
-                View resource details ›
-              </Text>
-            </View>
-          </Pressable>
-        ))}
 
         <View style={styles.bottomSpace} />
       </ScrollView>
@@ -382,6 +393,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
+  stateCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+
+  stateText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.md,
+  },
+
+  errorCard: {
+    backgroundColor: colors.dangerBackground,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+
+  errorTitle: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 5,
+  },
+
+  errorText: {
+    color: colors.text,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
   summaryCard: {
     backgroundColor: colors.primaryDark,
     borderRadius: radius.lg,
@@ -389,7 +438,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
 
   summaryItem: {
@@ -413,50 +462,6 @@ const styles = StyleSheet.create({
     width: 1,
     height: 38,
     backgroundColor: '#FFFFFF33',
-  },
-
-  alertCard: {
-    backgroundColor: colors.dangerBackground,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-
-  alertIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-
-  alertIconText: {
-    color: colors.surface,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  alertContent: {
-    flex: 1,
-  },
-
-  alertTitle: {
-    color: colors.danger,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: 3,
-  },
-
-  alertText: {
-    color: colors.text,
-    fontSize: 12,
-    lineHeight: 18,
   },
 
   sectionHeader: {
@@ -493,46 +498,24 @@ const styles = StyleSheet.create({
   resourceTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  resourceIdentity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: spacing.md,
-  },
-
-  resourceAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.primaryDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-
-  resourceAvatarText: {
-    color: colors.surface,
-    fontSize: 12,
-    fontWeight: '800',
+    alignItems: 'flex-start',
   },
 
   resourceInfo: {
     flex: 1,
+    marginRight: spacing.sm,
   },
 
   resourceName: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
 
   resourceRole: {
     color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 3,
+    fontSize: 12,
+    marginTop: 4,
   },
 
   statusBadge: {
@@ -542,7 +525,7 @@ const styles = StyleSheet.create({
   },
 
   statusText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
   },
 
@@ -570,19 +553,19 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
 
-  projectRow: {
+  metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: spacing.lg,
     marginTop: spacing.lg,
   },
 
-  allocationContainer: {
-    alignItems: 'flex-end',
+  metaItem: {
+    flex: 1,
   },
 
   metaLabel: {
     color: colors.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     marginBottom: 3,
   },
 
@@ -590,12 +573,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     fontWeight: '600',
-  },
-
-  allocationValue: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '800',
   },
 
   progressHeader: {
@@ -607,12 +584,12 @@ const styles = StyleSheet.create({
 
   progressLabel: {
     color: colors.textSecondary,
-    fontSize: 11,
+    fontSize: 12,
   },
 
   progressValue: {
     color: colors.text,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
 
@@ -640,16 +617,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
   },
 
-  viewRow: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: spacing.md,
     paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+
+  capacityText: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginRight: spacing.md,
   },
 
   viewText: {
     color: colors.primary,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
 

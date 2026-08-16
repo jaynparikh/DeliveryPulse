@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
+
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -9,35 +11,82 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+
+import {
+  colors,
+  radius,
+  spacing,
+} from '../theme';
+
+import { login } from '../services/api';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState(
     'manager@deliverypulse.com'
   );
 
-  const [password, setPassword] = useState('password');
+  const [password, setPassword] =
+    useState('password');
 
-  const handleLogin = () => {
-    router.replace('/dashboard');
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password) {
+      setError(
+        'Enter both email and password.'
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      await login(
+        email.trim(),
+        password
+      );
+
+      router.replace('/dashboard');
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Unable to sign in.';
+
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={
-        Platform.OS === 'ios' ? 'padding' : undefined
+        Platform.OS === 'ios'
+          ? 'padding'
+          : undefined
       }
     >
       <View style={styles.content}>
         <View style={styles.logo}>
-          <Text style={styles.logoText}>DP</Text>
+          <Text style={styles.logoText}>
+            DP
+          </Text>
         </View>
 
-        <Text style={styles.title}>DeliveryPulse</Text>
+        <Text style={styles.title}>
+          DeliveryPulse
+        </Text>
 
         <Text style={styles.subtitle}>
-          AI-powered project delivery intelligence
+          AI-powered project delivery
+          intelligence
         </Text>
 
         <View style={styles.card}>
@@ -46,50 +95,95 @@ export default function LoginScreen() {
           </Text>
 
           <Text style={styles.description}>
-            Sign in to access your delivery command center.
+            Sign in to access your delivery
+            command center.
           </Text>
 
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>
+            Email
+          </Text>
 
           <TextInput
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(value) => {
+              setEmail(value);
+              setError('');
+            }}
             placeholder="Enter your email"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={
+              colors.textSecondary
+            }
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
             style={styles.input}
+            editable={!loading}
           />
 
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>
+            Password
+          </Text>
 
           <TextInput
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(value) => {
+              setPassword(value);
+              setError('');
+            }}
             placeholder="Enter your password"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={
+              colors.textSecondary
+            }
             secureTextEntry
             style={styles.input}
+            editable={!loading}
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
           />
 
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>
+                {error}
+              </Text>
+            </View>
+          ) : null}
+
           <Pressable
-            style={styles.loginButton}
+            style={[
+              styles.loginButton,
+              loading &&
+                styles.loginButtonDisabled,
+            ]}
             onPress={handleLogin}
+            disabled={loading}
           >
-            <Text style={styles.loginButtonText}>
-              Sign in
-            </Text>
+            {loading ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.surface}
+              />
+            ) : (
+              <Text
+                style={
+                  styles.loginButtonText
+                }
+              >
+                Sign in
+              </Text>
+            )}
           </Pressable>
 
           <Text style={styles.demoText}>
-            Demo application. Authentication will be connected
-            to the backend later.
+            Demo access:
+            {'\n'}
+            manager@deliverypulse.com
           </Text>
         </View>
 
         <Text style={styles.footer}>
-          DeliveryPulse · Project Delivery Intelligence
+          DeliveryPulse · Project Delivery
+          Intelligence
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -182,6 +276,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
 
+  errorBox: {
+    backgroundColor:
+      colors.dangerBackground,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+
+  errorText: {
+    color: colors.danger,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+
   loginButton: {
     height: 50,
     borderRadius: radius.md,
@@ -189,6 +297,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.sm,
+  },
+
+  loginButtonDisabled: {
+    opacity: 0.65,
   },
 
   loginButtonText: {

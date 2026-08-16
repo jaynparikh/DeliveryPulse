@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { router } from 'expo-router';
+
 import {
+  ActivityIndicator,
   NativeSyntheticEvent,
   Pressable,
   ScrollView,
@@ -11,8 +13,17 @@ import {
   View,
 } from 'react-native';
 
-import { colors, radius, spacing } from '../theme';
+import {
+  colors,
+  radius,
+  spacing,
+} from '../theme';
+
 import BottomNav from '../components/BottomNav';
+
+import {
+  askCopilot,
+} from '../services/api';
 
 type Message = {
   id: number;
@@ -27,136 +38,25 @@ const suggestedQuestions = [
   'Give me a portfolio summary',
 ];
 
-const generateResponse = (question: string) => {
-  const normalized = question.toLowerCase();
-
-  if (
-    normalized.includes('busy') ||
-    normalized.includes('overloaded') ||
-    normalized.includes('capacity') ||
-    normalized.includes('resource') ||
-    normalized.includes('workload') ||
-    normalized.includes('too much work')
-  ) {
-    return `The clearest capacity concern is currently with the data engineering team supporting Project Orion.
-
-Priya Desai is the project owner, and the team is operating above sustainable allocation levels.
-
-Recommended action:
-• Move secondary support activities to available capacity.
-• Review allocations against the next delivery milestone.
-• Bring the overloaded resource back below 100% allocation.
-
-From a delivery perspective, this is worth addressing now because sustained over-allocation can become both a schedule and quality risk.`;
-  }
-
-  if (
-    normalized.includes('attention') ||
-    normalized.includes('project') ||
-    normalized.includes('projects') ||
-    normalized.includes('behind') ||
-    normalized.includes('delayed')
-  ) {
-    return `Three projects currently deserve the most attention.
-
-1. Project Phoenix — At Risk
-API integration is three days behind schedule.
-
-2. Project Atlas — Watch
-Five unresolved UAT defects remain.
-
-3. Project Horizon — Watch
-Cloud environment provisioning is taking longer than planned.
-
-Priority recommendation:
-Start with Phoenix because the integration delay is already affecting dependent activities.
-
-Project Nova, Project Orion and Project Vertex are currently healthy.`;
-  }
-
-  if (
-    normalized.includes('risk') ||
-    normalized.includes('risks') ||
-    normalized.includes('danger')
-  ) {
-    return `The highest-priority delivery risks are:
-
-• API integration delay — Project Phoenix
-Critical
-
-• UAT defects — Project Atlas
-High
-
-• Resource capacity pressure — Project Orion
-High
-
-• Cloud environment provisioning — Project Horizon
-Medium
-
-The Phoenix API dependency should be the first escalation because it is already affecting dependent delivery activities.
-
-Recommended management focus:
-1. Remove the Phoenix dependency.
-2. Drive Atlas defect closure.
-3. Correct the Orion capacity imbalance.`;
-  }
-
-  if (
-    normalized.includes('summary') ||
-    normalized.includes('portfolio') ||
-    normalized.includes('overall') ||
-    normalized.includes('health')
-  ) {
-    return `Portfolio snapshot:
-
-• 6 active projects
-• 2 projects require elevated attention
-• 83% average delivery progress
-• 5 active delivery risks
-• 3 high-priority risks
-
-Overall assessment:
-The portfolio is progressing, but Phoenix and Atlas require management attention.
-
-The key leadership question is not simply "Are projects on track?"
-
-It is:
-"Which exception needs intervention before it becomes a delivery issue?"
-
-Recommended focus:
-Phoenix → API dependency
-Atlas → UAT defects
-Orion → Capacity pressure`;
-  }
-
-  return `I can currently help you analyze:
-
-• Project health and delivery status
-• Delivery risks and priorities
-• Team capacity and workload
-• Portfolio-level performance
-
-Try asking:
-"Who is busy?"
-"Which projects need attention?"
-"What are the biggest risks?"
-or
-"Give me a portfolio summary."`;
-};
-
 export default function CopilotScreen() {
-  const [question, setQuestion] = useState('');
+  const [question, setQuestion] =
+    useState('');
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      role: 'assistant',
-      text:
-        'Hi Jay. I’m your DeliveryPulse Copilot. Ask me about project health, risks, capacity or portfolio performance.',
-    },
-  ]);
+  const [loading, setLoading] =
+    useState(false);
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const [messages, setMessages] =
+    useState<Message[]>([
+      {
+        id: 1,
+        role: 'assistant',
+        text:
+          'Hi Jay. I’m your DeliveryPulse Copilot. Ask me about project health, risks, capacity or portfolio performance.',
+      },
+    ]);
+
+  const scrollViewRef =
+    useRef<ScrollView>(null);
 
   const scrollToConversation = () => {
     setTimeout(() => {
@@ -166,10 +66,13 @@ export default function CopilotScreen() {
     }, 150);
   };
 
-  const askQuestion = (value?: string) => {
-    const text = (value ?? question).trim();
+  const askQuestion = async (
+    value?: string
+  ) => {
+    const text =
+      (value ?? question).trim();
 
-    if (!text) {
+    if (!text || loading) {
       return;
     }
 
@@ -179,21 +82,49 @@ export default function CopilotScreen() {
       text,
     };
 
-    const assistantMessage: Message = {
-      id: Date.now() + 1,
-      role: 'assistant',
-      text: generateResponse(text),
-    };
-
     setMessages((current) => [
       ...current,
       userMessage,
-      assistantMessage,
     ]);
 
     setQuestion('');
+    setLoading(true);
 
     scrollToConversation();
+
+    try {
+      const answer =
+        await askCopilot(text);
+
+      const assistantMessage: Message = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        text: answer,
+      };
+
+      setMessages((current) => [
+        ...current,
+        assistantMessage,
+      ]);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Unable to generate Copilot response.';
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: Date.now() + 1,
+          role: 'assistant',
+          text:
+            `I couldn't generate the delivery insight right now.\n\n${message}`,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+      scrollToConversation();
+    }
   };
 
   const handleKeyPress = (
@@ -203,7 +134,10 @@ export default function CopilotScreen() {
       event.nativeEvent.key === 'Enter'
     ) {
       event.preventDefault();
-      askQuestion();
+
+      if (!loading) {
+        askQuestion();
+      }
     }
   };
 
@@ -226,13 +160,16 @@ export default function CopilotScreen() {
             </Text>
 
             <Text style={styles.subtitle}>
-              Turn delivery data into actionable decisions
+              Turn delivery data into
+              actionable decisions
             </Text>
           </View>
 
           <Pressable
             style={styles.avatar}
-            onPress={() => router.replace('/login')}
+            onPress={() =>
+              router.replace('/login')
+            }
           >
             <Text style={styles.avatarText}>
               JP
@@ -247,13 +184,20 @@ export default function CopilotScreen() {
             </Text>
           </View>
 
-          <View style={styles.aiBannerContent}>
-            <Text style={styles.aiBannerTitle}>
+          <View
+            style={styles.aiBannerContent}
+          >
+            <Text
+              style={styles.aiBannerTitle}
+            >
               Delivery intelligence
             </Text>
 
-            <Text style={styles.aiBannerText}>
-              Ask questions about your portfolio and get
+            <Text
+              style={styles.aiBannerText}
+            >
+              Ask questions about your
+              portfolio and get
               decision-focused insights.
             </Text>
           </View>
@@ -264,24 +208,40 @@ export default function CopilotScreen() {
         </Text>
 
         <View style={styles.suggestions}>
-          {suggestedQuestions.map((item) => (
-            <Pressable
-              key={item}
-              style={({ pressed }) => [
-                styles.suggestion,
-                pressed && styles.suggestionPressed,
-              ]}
-              onPress={() => askQuestion(item)}
-            >
-              <Text style={styles.suggestionText}>
-                {item}
-              </Text>
+          {suggestedQuestions.map(
+            (item) => (
+              <Pressable
+                key={item}
+                style={({ pressed }) => [
+                  styles.suggestion,
+                  pressed &&
+                    styles.suggestionPressed,
+                  loading &&
+                    styles.suggestionDisabled,
+                ]}
+                onPress={() =>
+                  askQuestion(item)
+                }
+                disabled={loading}
+              >
+                <Text
+                  style={
+                    styles.suggestionText
+                  }
+                >
+                  {item}
+                </Text>
 
-              <Text style={styles.suggestionArrow}>
-                ›
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={
+                    styles.suggestionArrow
+                  }
+                >
+                  ›
+                </Text>
+              </Pressable>
+            )
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>
@@ -290,19 +250,29 @@ export default function CopilotScreen() {
 
         <View style={styles.conversation}>
           {messages.map((message) => {
-            const isUser = message.role === 'user';
+            const isUser =
+              message.role === 'user';
 
             return (
               <View
                 key={message.id}
                 style={[
                   styles.messageRow,
-                  isUser && styles.userMessageRow,
+                  isUser &&
+                    styles.userMessageRow,
                 ]}
               >
                 {!isUser && (
-                  <View style={styles.messageIcon}>
-                    <Text style={styles.messageIconText}>
+                  <View
+                    style={
+                      styles.messageIcon
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.messageIconText
+                      }
+                    >
                       ✦
                     </Text>
                   </View>
@@ -329,31 +299,87 @@ export default function CopilotScreen() {
               </View>
             );
           })}
+
+          {loading && (
+            <View style={styles.messageRow}>
+              <View
+                style={styles.messageIcon}
+              >
+                <Text
+                  style={
+                    styles.messageIconText
+                  }
+                >
+                  ✦
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.messageBubble,
+                  styles.assistantBubble,
+                  styles.loadingBubble,
+                ]}
+              >
+                <ActivityIndicator
+                  size="small"
+                  color={colors.primary}
+                />
+
+                <Text
+                  style={styles.thinkingText}
+                >
+                  Analyzing delivery data...
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={styles.inputSection}>
           <TextInput
             value={question}
             onChangeText={setQuestion}
-            placeholder="Ask about your delivery portfolio..."
-            placeholderTextColor={colors.textSecondary}
+            placeholder={
+              loading
+                ? 'Copilot is analyzing...'
+                : 'Ask about your delivery portfolio...'
+            }
+            placeholderTextColor={
+              colors.textSecondary
+            }
             multiline={false}
             returnKeyType="send"
             onKeyPress={handleKeyPress}
-            onSubmitEditing={() => askQuestion()}
+            onSubmitEditing={() => {
+              if (!loading) {
+                askQuestion();
+              }
+            }}
             style={styles.input}
+            editable={!loading}
           />
 
           <Pressable
             style={[
               styles.sendButton,
-              !question.trim() &&
+              (!question.trim() ||
+                loading) &&
                 styles.sendButtonDisabled,
             ]}
-            onPress={() => askQuestion()}
-            disabled={!question.trim()}
+            onPress={() =>
+              askQuestion()
+            }
+            disabled={
+              !question.trim() ||
+              loading
+            }
           >
-            <Text style={styles.sendButtonText}>
+            <Text
+              style={
+                styles.sendButtonText
+              }
+            >
               ↑
             </Text>
           </Pressable>
@@ -364,8 +390,11 @@ export default function CopilotScreen() {
         </Text>
 
         <Text style={styles.disclaimer}>
-          Copilot insights are based on the delivery data
-          currently available in DeliveryPulse.
+          Copilot analyzes the delivery
+          information currently available
+          in DeliveryPulse. AI-generated
+          recommendations should be
+          reviewed before action.
         </Text>
 
         <View style={styles.bottomSpace} />
@@ -379,7 +408,8 @@ export default function CopilotScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor:
+      colors.background,
   },
 
   container: {
@@ -397,7 +427,8 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent:
+      'space-between',
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
@@ -430,7 +461,8 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: colors.primary,
+    backgroundColor:
+      colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -442,7 +474,8 @@ const styles = StyleSheet.create({
   },
 
   aiBanner: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor:
+      colors.primaryDark,
     borderRadius: radius.lg,
     padding: spacing.lg,
     flexDirection: 'row',
@@ -495,20 +528,26 @@ const styles = StyleSheet.create({
   },
 
   suggestion: {
-    backgroundColor: colors.surface,
+    backgroundColor:
+      colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent:
+      'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
 
   suggestionPressed: {
     opacity: 0.75,
+  },
+
+  suggestionDisabled: {
+    opacity: 0.55,
   },
 
   suggestionText: {
@@ -563,13 +602,27 @@ const styles = StyleSheet.create({
   },
 
   assistantBubble: {
-    backgroundColor: colors.surface,
+    backgroundColor:
+      colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
 
   userBubble: {
-    backgroundColor: colors.primary,
+    backgroundColor:
+      colors.primary,
+  },
+
+  loadingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  thinkingText: {
+    color:
+      colors.textSecondary,
+    fontSize: 12,
+    marginLeft: spacing.sm,
   },
 
   messageText: {
@@ -583,7 +636,8 @@ const styles = StyleSheet.create({
   },
 
   inputSection: {
-    backgroundColor: colors.surface,
+    backgroundColor:
+      colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -604,7 +658,8 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: colors.primary,
+    backgroundColor:
+      colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -620,14 +675,16 @@ const styles = StyleSheet.create({
   },
 
   enterHint: {
-    color: colors.textSecondary,
+    color:
+      colors.textSecondary,
     fontSize: 9,
     textAlign: 'right',
     marginTop: 4,
   },
 
   disclaimer: {
-    color: colors.textSecondary,
+    color:
+      colors.textSecondary,
     fontSize: 10,
     lineHeight: 15,
     textAlign: 'center',

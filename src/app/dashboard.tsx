@@ -1,66 +1,239 @@
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+
 import { colors, radius, spacing } from '../theme';
 import BottomNav from '../components/BottomNav';
 
-const metrics = [
-  {
-    label: 'Active Projects',
-    value: '6',
-    detail: '2 need attention',
-    type: 'info',
-  },
-  {
-    label: 'At Risk',
-    value: '2',
-    detail: '1 critical',
-    type: 'danger',
-  },
-  {
-    label: 'Team Capacity',
-    value: '83%',
-    detail: 'Healthy',
-    type: 'success',
-  },
-  {
-    label: 'Open Risks',
-    value: '8',
-    detail: '3 high priority',
-    type: 'warning',
-  },
-];
+import {
+  getPortfolioSummary,
+  getProjects,
+  getResources,
+  getRisks,
+  PortfolioSummary,
+  Project,
+  Resource,
+  Risk,
+} from '../services/api';
 
-const projects = [
-  {
-    name: 'Project Phoenix',
-    client: 'Enterprise IoT Platform',
-    progress: 72,
-    status: 'At Risk',
-    statusType: 'danger',
-  },
-  {
-    name: 'Project Atlas',
-    client: 'Customer Analytics',
-    progress: 58,
-    status: 'Watch',
-    statusType: 'warning',
-  },
-  {
-    name: 'Project Nova',
-    client: 'Mobile Experience',
-    progress: 84,
-    status: 'Healthy',
-    statusType: 'success',
-  },
-];
+type MetricType =
+  | 'info'
+  | 'danger'
+  | 'success'
+  | 'warning';
+
+type Metric = {
+  label: string;
+  value: string;
+  detail: string;
+  type: MetricType;
+};
 
 export default function DashboardScreen() {
+  const [projects, setProjects] =
+    useState<Project[]>([]);
+
+  const [risks, setRisks] =
+    useState<Risk[]>([]);
+
+  const [resources, setResources] =
+    useState<Resource[]>([]);
+
+  const [summary, setSummary] =
+    useState<PortfolioSummary | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState('');
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const [
+          projectData,
+          riskData,
+          resourceData,
+          summaryData,
+        ] = await Promise.all([
+          getProjects(),
+          getRisks(),
+          getResources(),
+          getPortfolioSummary(),
+        ]);
+
+        if (!ignore) {
+          setProjects(projectData);
+          setRisks(riskData);
+          setResources(resourceData);
+          setSummary(summaryData);
+        }
+      } catch (err) {
+        console.error(
+          'Dashboard loading error:',
+          err
+        );
+
+        if (!ignore) {
+          setError(
+            'Unable to load dashboard data from DeliveryPulse API.'
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const averageAllocation =
+    resources.length > 0
+      ? Math.round(
+          resources.reduce(
+            (total, resource) =>
+              total + resource.allocation,
+            0
+          ) / resources.length
+        )
+      : 0;
+
+  const criticalRisks = risks.filter(
+    (risk) => risk.severity === 'Critical'
+  ).length;
+
+  const openHighPriorityRisks =
+    risks.filter(
+      (risk) =>
+        risk.status === 'Open' &&
+        (risk.severity === 'Critical' ||
+          risk.severity === 'High')
+    ).length;
+
+  const attentionProjects = summary
+    ? summary.atRiskProjects +
+      summary.watchProjects
+    : 0;
+
+  const metrics: Metric[] = summary
+    ? [
+        {
+          label: 'Active Projects',
+          value: String(
+            summary.activeProjects
+          ),
+          detail: `${attentionProjects} need attention`,
+          type: 'info',
+        },
+        {
+          label: 'At Risk',
+          value: String(
+            summary.atRiskProjects
+          ),
+          detail: `${criticalRisks} critical risk${
+            criticalRisks === 1
+              ? ''
+              : 's'
+          }`,
+          type: 'danger',
+        },
+        {
+          label: 'Team Capacity',
+          value: `${averageAllocation}%`,
+          detail:
+            summary.overloadedResources > 0
+              ? `${summary.overloadedResources} overloaded`
+              : 'Healthy',
+          type:
+            summary.overloadedResources > 0
+              ? 'warning'
+              : 'success',
+        },
+        {
+          label: 'Open Risks',
+          value: String(
+            summary.openRisks
+          ),
+          detail: `${openHighPriorityRisks} high priority`,
+          type: 'warning',
+        },
+      ]
+    : [];
+
+  const dashboardProjects =
+    projects.slice(0, 3);
+
+  const atRiskProject =
+    projects.find(
+      (project) =>
+        project.status === 'At Risk'
+    );
+
+  const watchProject =
+    projects.find(
+      (project) =>
+        project.status === 'Watch'
+    );
+
+  const overloadedResource =
+    resources.find(
+      (resource) =>
+        resource.status === 'Overloaded'
+    );
+
+  const briefItems = [
+    atRiskProject
+      ? {
+          key: 'risk-project',
+          text: `${atRiskProject.name}: ${atRiskProject.risk}`,
+          color: colors.danger,
+        }
+      : null,
+
+    watchProject
+      ? {
+          key: 'watch-project',
+          text: `${watchProject.name}: ${watchProject.risk}`,
+          color: colors.warning,
+        }
+      : null,
+
+    overloadedResource
+      ? {
+          key: 'capacity',
+          text: `${overloadedResource.name} is allocated at ${overloadedResource.allocation}% on ${overloadedResource.project}.`,
+          color: colors.info,
+        }
+      : null,
+  ].filter(
+    (
+      item
+    ): item is {
+      key: string;
+      text: string;
+      color: string;
+    } => item !== null
+  );
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -70,8 +243,14 @@ export default function DashboardScreen() {
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good morning</Text>
-            <Text style={styles.title}>DeliveryPulse</Text>
+            <Text style={styles.greeting}>
+              Good morning
+            </Text>
+
+            <Text style={styles.title}>
+              DeliveryPulse
+            </Text>
+
             <Text style={styles.subtitle}>
               Your delivery command center
             </Text>
@@ -79,228 +258,352 @@ export default function DashboardScreen() {
 
           <Pressable
             style={styles.avatar}
-            onPress={() => router.replace('/login')}
+            onPress={() =>
+              router.replace('/login')
+            }
           >
-            <Text style={styles.avatarText}>JP</Text>
+            <Text style={styles.avatarText}>
+              JP
+            </Text>
           </Pressable>
         </View>
 
-        <View style={styles.briefCard}>
-          <View style={styles.briefHeader}>
-            <View>
-              <Text style={styles.briefLabel}>TODAY'S BRIEF</Text>
-              <Text style={styles.briefTitle}>
-                3 things need your attention
+        {loading ? (
+          <View style={styles.stateCard}>
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+            />
+
+            <Text style={styles.stateText}>
+              Loading delivery dashboard...
+            </Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorTitle}>
+              Unable to load dashboard
+            </Text>
+
+            <Text style={styles.errorText}>
+              {error}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.briefCard}>
+              <View style={styles.briefHeader}>
+                <View>
+                  <Text style={styles.briefLabel}>
+                    TODAY&apos;S BRIEF
+                  </Text>
+
+                  <Text style={styles.briefTitle}>
+                    {briefItems.length}{' '}
+                    {briefItems.length === 1
+                      ? 'thing needs'
+                      : 'things need'}{' '}
+                    your attention
+                  </Text>
+                </View>
+
+                <View style={styles.aiBadge}>
+                  <Text
+                    style={styles.aiBadgeText}
+                  >
+                    AI
+                  </Text>
+                </View>
+              </View>
+
+              {briefItems.map((item) => (
+                <View
+                  key={item.key}
+                  style={styles.briefItem}
+                >
+                  <View
+                    style={[
+                      styles.dot,
+                      {
+                        backgroundColor:
+                          item.color,
+                      },
+                    ]}
+                  />
+
+                  <Text
+                    style={styles.briefText}
+                  >
+                    {item.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.sectionTitle}>
+              Portfolio Overview
+            </Text>
+
+            <View style={styles.metricsGrid}>
+              {metrics.map((metric) => (
+                <View
+                  key={metric.label}
+                  style={styles.metricCard}
+                >
+                  <Text
+                    style={styles.metricLabel}
+                  >
+                    {metric.label}
+                  </Text>
+
+                  <Text
+                    style={styles.metricValue}
+                  >
+                    {metric.value}
+                  </Text>
+
+                  <View
+                    style={[
+                      styles.metricStatus,
+                      metric.type ===
+                        'danger' &&
+                        styles.dangerBackground,
+                      metric.type ===
+                        'warning' &&
+                        styles.warningBackground,
+                      metric.type ===
+                        'success' &&
+                        styles.successBackground,
+                      metric.type ===
+                        'info' &&
+                        styles.infoBackground,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.metricDetail,
+                        metric.type ===
+                          'danger' &&
+                          styles.dangerText,
+                        metric.type ===
+                          'warning' &&
+                          styles.warningText,
+                        metric.type ===
+                          'success' &&
+                          styles.successText,
+                        metric.type ===
+                          'info' &&
+                          styles.infoText,
+                      ]}
+                    >
+                      {metric.detail}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                Projects
               </Text>
+
+              <Pressable
+                onPress={() =>
+                  router.replace('/projects')
+                }
+              >
+                <Text style={styles.viewAll}>
+                  View all
+                </Text>
+              </Pressable>
             </View>
 
-            <View style={styles.aiBadge}>
-              <Text style={styles.aiBadgeText}>AI</Text>
-            </View>
-          </View>
+            {dashboardProjects.map(
+              (project) => (
+                <Pressable
+                  key={project.id}
+                  style={({ pressed }) => [
+                    styles.projectCard,
+                    pressed &&
+                      styles.projectCardPressed,
+                  ]}
+                  onPress={() =>
+                    router.push({
+                      pathname:
+                        '/project-details',
+                      params: {
+                        name: project.name,
+                      },
+                    })
+                  }
+                >
+                  <View
+                    style={
+                      styles.projectTopRow
+                    }
+                  >
+                    <View
+                      style={styles.projectInfo}
+                    >
+                      <Text
+                        style={
+                          styles.projectName
+                        }
+                      >
+                        {project.name}
+                      </Text>
 
-          <View style={styles.briefItem}>
-            <View
-              style={[
-                styles.dot,
-                { backgroundColor: colors.danger },
-              ]}
-            />
-            <Text style={styles.briefText}>
-              Phoenix API integration is 3 days behind schedule.
-            </Text>
-          </View>
+                      <Text
+                        style={
+                          styles.projectClient
+                        }
+                      >
+                        {project.client}
+                      </Text>
+                    </View>
 
-          <View style={styles.briefItem}>
-            <View
-              style={[
-                styles.dot,
-                { backgroundColor: colors.warning },
-              ]}
-            />
-            <Text style={styles.briefText}>
-              Atlas has 5 unresolved UAT defects.
-            </Text>
-          </View>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        project.statusType ===
+                          'danger' &&
+                          styles.dangerBackground,
+                        project.statusType ===
+                          'warning' &&
+                          styles.warningBackground,
+                        project.statusType ===
+                          'success' &&
+                          styles.successBackground,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusText,
+                          project.statusType ===
+                            'danger' &&
+                            styles.dangerText,
+                          project.statusType ===
+                            'warning' &&
+                            styles.warningText,
+                          project.statusType ===
+                            'success' &&
+                            styles.successText,
+                        ]}
+                      >
+                        {project.status}
+                      </Text>
+                    </View>
+                  </View>
 
-          <View style={styles.briefItem}>
-            <View
-              style={[
-                styles.dot,
-                { backgroundColor: colors.info },
-              ]}
-            />
-            <Text style={styles.briefText}>
-              Engineering capacity reached 106%.
-            </Text>
-          </View>
-        </View>
+                  <View
+                    style={
+                      styles.progressHeader
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.progressLabel
+                      }
+                    >
+                      Delivery progress
+                    </Text>
 
-        <Text style={styles.sectionTitle}>
-          Portfolio Overview
-        </Text>
+                    <Text
+                      style={
+                        styles.progressValue
+                      }
+                    >
+                      {project.progress}%
+                    </Text>
+                  </View>
 
-        <View style={styles.metricsGrid}>
-          {metrics.map((metric) => (
-            <View
-              key={metric.label}
-              style={styles.metricCard}
+                  <View
+                    style={
+                      styles.progressBackground
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.progressBar,
+                        {
+                          width: `${project.progress}%`,
+                        },
+                        project.statusType ===
+                          'danger' &&
+                          styles.dangerBar,
+                        project.statusType ===
+                          'warning' &&
+                          styles.warningBar,
+                        project.statusType ===
+                          'success' &&
+                          styles.successBar,
+                      ]}
+                    />
+                  </View>
+                </Pressable>
+              )
+            )}
+
+            <Pressable
+              style={styles.copilotCard}
+              onPress={() =>
+                router.replace('/copilot')
+              }
             >
-              <Text style={styles.metricLabel}>
-                {metric.label}
-              </Text>
-
-              <Text style={styles.metricValue}>
-                {metric.value}
-              </Text>
-
               <View
-                style={[
-                  styles.metricStatus,
-                  metric.type === 'danger' &&
-                    styles.dangerBackground,
-                  metric.type === 'warning' &&
-                    styles.warningBackground,
-                  metric.type === 'success' &&
-                    styles.successBackground,
-                  metric.type === 'info' &&
-                    styles.infoBackground,
-                ]}
+                style={styles.copilotIcon}
               >
                 <Text
-                  style={[
-                    styles.metricDetail,
-                    metric.type === 'danger' &&
-                      styles.dangerText,
-                    metric.type === 'warning' &&
-                      styles.warningText,
-                    metric.type === 'success' &&
-                      styles.successText,
-                    metric.type === 'info' &&
-                      styles.infoText,
-                  ]}
+                  style={
+                    styles.copilotIconText
+                  }
                 >
-                  {metric.detail}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            Projects
-          </Text>
-
-          <Pressable
-            onPress={() => router.replace('/projects')}
-          >
-            <Text style={styles.viewAll}>View all</Text>
-          </Pressable>
-        </View>
-
-        {projects.map((project) => (
-          <View
-            key={project.name}
-            style={styles.projectCard}
-          >
-            <View style={styles.projectTopRow}>
-              <View style={styles.projectInfo}>
-                <Text style={styles.projectName}>
-                  {project.name}
-                </Text>
-
-                <Text style={styles.projectClient}>
-                  {project.client}
+                  ✦
                 </Text>
               </View>
 
               <View
-                style={[
-                  styles.statusBadge,
-                  project.statusType === 'danger' &&
-                    styles.dangerBackground,
-                  project.statusType === 'warning' &&
-                    styles.warningBackground,
-                  project.statusType === 'success' &&
-                    styles.successBackground,
-                ]}
+                style={styles.copilotContent}
               >
                 <Text
-                  style={[
-                    styles.statusText,
-                    project.statusType === 'danger' &&
-                      styles.dangerText,
-                    project.statusType === 'warning' &&
-                      styles.warningText,
-                    project.statusType === 'success' &&
-                      styles.successText,
-                  ]}
+                  style={styles.copilotTitle}
                 >
-                  {project.status}
+                  Ask Delivery Copilot
+                </Text>
+
+                <Text
+                  style={
+                    styles.copilotSubtitle
+                  }
+                >
+                  Get AI-powered insights
+                  about your projects, risks
+                  and team.
                 </Text>
               </View>
-            </View>
 
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>
-                Delivery progress
+              <Text style={styles.arrow}>
+                ›
               </Text>
+            </Pressable>
 
-              <Text style={styles.progressValue}>
-                {project.progress}%
+            <Pressable
+              style={styles.briefButton}
+              onPress={() =>
+                router.replace('/brief')
+              }
+            >
+              <Text
+                style={
+                  styles.briefButtonText
+                }
+              >
+                View Daily Delivery Brief
               </Text>
-            </View>
-
-            <View style={styles.progressBackground}>
-              <View
-                style={[
-                  styles.progressBar,
-                  {
-                    width: `${project.progress}%`,
-                  },
-                  project.statusType === 'danger' &&
-                    styles.dangerBar,
-                  project.statusType === 'warning' &&
-                    styles.warningBar,
-                  project.statusType === 'success' &&
-                    styles.successBar,
-                ]}
-              />
-            </View>
-          </View>
-        ))}
-
-        <Pressable
-          style={styles.copilotCard}
-          onPress={() => router.replace('/copilot')}
-        >
-          <View style={styles.copilotIcon}>
-            <Text style={styles.copilotIconText}>✦</Text>
-          </View>
-
-          <View style={styles.copilotContent}>
-            <Text style={styles.copilotTitle}>
-              Ask Delivery Copilot
-            </Text>
-
-            <Text style={styles.copilotSubtitle}>
-              Get AI-powered insights about your projects,
-              risks and team.
-            </Text>
-          </View>
-
-          <Text style={styles.arrow}>›</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.briefButton}
-          onPress={() => router.replace('/brief')}
-        >
-          <Text style={styles.briefButtonText}>
-            View Daily Delivery Brief
-          </Text>
-        </Pressable>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
 
       <BottomNav />
@@ -365,6 +668,42 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 14,
+  },
+
+  stateCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+
+  stateText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.md,
+  },
+
+  errorCard: {
+    backgroundColor: colors.dangerBackground,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    padding: spacing.lg,
+  },
+
+  errorTitle: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 5,
+  },
+
+  errorText: {
+    color: colors.text,
+    fontSize: 12,
+    lineHeight: 18,
   },
 
   briefCard: {
@@ -533,6 +872,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.md,
+  },
+
+  projectCardPressed: {
+    opacity: 0.85,
   },
 
   projectTopRow: {
