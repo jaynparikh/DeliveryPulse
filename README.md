@@ -1,6 +1,6 @@
 # DeliveryPulse
 
-### AI-Powered Project Delivery Intelligence
+## AI-Powered Project Delivery Intelligence
 
 DeliveryPulse is a portfolio-level project delivery management application designed to help delivery managers identify project exceptions, delivery risks, capacity constraints, and management priorities from a single interface.
 
@@ -25,11 +25,11 @@ Provides a management-level view of:
 - High-priority risks
 - Resource capacity concerns
 
-The dashboard highlights exceptions instead of requiring managers to inspect every project individually.
+The dashboard is designed around management by exception — highlighting areas requiring attention rather than simply presenting project data.
 
 ### Project Management
 
-View project-level information including:
+Monitor project-level information including:
 
 - Delivery status
 - Progress
@@ -38,15 +38,11 @@ View project-level information including:
 - Delivery risk
 - Management assessment
 
-Projects are classified as:
-
-- Healthy
-- Watch
-- At Risk
+Projects are classified as **Healthy**, **Watch**, or **At Risk**.
 
 ### Risk Management
 
-Centralized delivery risk tracking with:
+Centralized delivery-risk tracking covering:
 
 - Risk severity
 - Risk status
@@ -55,40 +51,25 @@ Centralized delivery risk tracking with:
 - Description
 - Recommended management action
 
-Risk detail screens provide additional delivery assessment and management context.
-
 ### Resource Capacity
 
-Monitor resource allocation and identify capacity pressure.
+Monitor resource allocation and identify capacity pressure across the portfolio.
 
-DeliveryPulse highlights:
-
-- Current allocation
-- Available capacity
-- Overloaded resources
-- Project assignment
-- Capacity assessment
-
-This helps identify delivery risk created by sustained resource over-allocation.
+DeliveryPulse highlights current allocation, available capacity, overloaded resources, project assignments, and capacity concerns.
 
 ### Daily Delivery Brief
 
-DeliveryPulse automatically generates a short management brief based on current portfolio data.
+The Daily Delivery Brief converts current portfolio conditions into a short list of management priorities.
 
-The brief prioritizes actions such as:
+Instead of another dashboard, it answers:
 
-- Reviewing At Risk projects
-- Acting on critical delivery risks
-- Monitoring Watch projects
-- Addressing overloaded resources
-
-The objective is to convert delivery data into a short list of management actions.
+> **What needs my attention today?**
 
 ### AI Delivery Copilot
 
-The DeliveryPulse Copilot allows managers to ask natural-language questions about their delivery portfolio.
+The DeliveryPulse Copilot allows managers to ask natural-language questions about their portfolio.
 
-Example questions:
+Examples:
 
 - Which project needs my intervention?
 - Which projects need attention?
@@ -96,7 +77,7 @@ Example questions:
 - Who is overloaded?
 - Give me a portfolio summary.
 
-The Copilot combines current project, risk, and resource data with an AI model to produce management-focused responses.
+The Copilot uses current delivery context to generate management-focused analysis and recommended actions.
 
 ---
 
@@ -108,7 +89,7 @@ The Copilot combines current project, risk, and resource data with an AI model t
 
 ### Projects
 
-![Projects](screenshots/projects.png)
+![DeliveryPulse Projects](screenshots/projects.png)
 
 ### Project Details
 
@@ -116,11 +97,11 @@ The Copilot combines current project, risk, and resource data with an AI model t
 
 ### Risks
 
-![Risks](screenshots/risks.png)
+![Delivery Risks](screenshots/risks.png)
 
-### Resource Capacity
+### Resources
 
-![Resources](screenshots/resources.png)
+![Resource Capacity](screenshots/resources.png)
 
 ### Daily Delivery Brief
 
@@ -134,7 +115,7 @@ The Copilot combines current project, risk, and resource data with an AI model t
 
 ## Technology Stack
 
-### Mobile / Frontend
+### Frontend
 
 - React Native
 - Expo
@@ -148,7 +129,7 @@ The Copilot combines current project, risk, and resource data with an AI model t
 - TypeScript
 - REST APIs
 
-### Database
+### Data
 
 - PostgreSQL
 - Prisma ORM
@@ -160,15 +141,15 @@ The Copilot combines current project, risk, and resource data with an AI model t
 
 ### Development
 
-- VS Code
 - Git
 - GitHub
+- VS Code
 
 ---
 
 ## Architecture
 
-DeliveryPulse uses a layered architecture:
+DeliveryPulse uses a client-server architecture:
 
 ```text
 React Native / Expo
@@ -177,8 +158,183 @@ React Native / Expo
         v
 Node.js / Express
         |
-        +------------------+
-        |                  |
-        v                  v
- PostgreSQL             Gemini
-   Prisma               AI API
+        +-------------------+
+        |                   |
+        v                   v
+   PostgreSQL          Google Gemini
+   Prisma ORM            AI API
+```
+
+The mobile application consumes portfolio information through backend REST APIs.
+
+PostgreSQL and Prisma provide structured project, risk, and resource information.
+
+The backend also integrates with Google Gemini to provide AI-powered delivery analysis.
+
+For additional information, see:
+
+[Architecture Documentation](docs/ARCHITECTURE.md)
+
+---
+
+## Project Structure
+
+```text
+DeliveryPulse/
+│
+├── src/
+│   ├── app/
+│   ├── components/
+│   ├── data/
+│   ├── services/
+│   └── theme.ts
+│
+├── server/
+│   ├── prisma/
+│   └── src/
+│
+├── docs/
+├── screenshots/
+├── package.json
+└── README.md
+```
+
+---
+
+## Running the Project
+
+### Prerequisites
+
+- Node.js
+- npm
+- PostgreSQL
+
+### Install Frontend Dependencies
+
+From the project root:
+
+```bash
+npm install
+```
+
+### Install Backend Dependencies
+
+```bash
+cd server
+npm install
+```
+
+### Environment Configuration
+
+Backend environment variables are intentionally excluded from Git.
+
+Configure the environment values required for:
+
+- PostgreSQL database connection
+- Gemini API access
+
+### Prisma
+
+From the `server` directory:
+
+```bash
+npx prisma generate
+```
+
+Run database migrations when required:
+
+```bash
+npx prisma migrate dev
+```
+
+Seed the demonstration portfolio:
+
+```bash
+npm run prisma:seed
+```
+
+### Start Backend
+
+From the `server` directory:
+
+```bash
+npm run dev
+```
+
+### Start DeliveryPulse
+
+From the project root:
+
+```bash
+npx expo start
+```
+
+For web:
+
+```bash
+npx expo start --web
+```
+
+---
+
+## Example AI Use Case
+
+A delivery manager can ask:
+
+> **Which project needs my intervention?**
+
+DeliveryPulse can evaluate portfolio context including:
+
+- Project health
+- Delivery progress
+- Open risks
+- Risk severity
+- Resource allocation
+- Delivery dependencies
+
+The Copilot then identifies the highest-priority exception, explains the supporting facts, and recommends management actions.
+
+This demonstrates how generative AI can be applied as an intelligence layer over structured project-delivery data rather than operating as a standalone chatbot.
+
+---
+
+## Design Philosophy
+
+DeliveryPulse is built around **management by exception**.
+
+A delivery manager should not need to inspect every project, risk, and resource every morning.
+
+The system should help answer four questions:
+
+1. What is happening?
+2. What needs attention?
+3. Why does it matter?
+4. What should management do next?
+
+---
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Features](docs/FEATURES.md)
+- [AI Copilot](docs/AI-COPILOT.md)
+
+---
+
+## Project Status
+
+Portfolio demonstration project.
+
+The current implementation demonstrates an end-to-end workflow across project portfolio management, delivery risks, resource capacity, daily delivery intelligence, backend APIs, persistence, and AI-assisted portfolio analysis.
+
+---
+
+## Author
+
+**Jay Parikh**
+
+Project & Delivery Management | AI & Digital Transformation
+
+Website: jay-parikh.com
+
+GitHub: @jaynparikh
